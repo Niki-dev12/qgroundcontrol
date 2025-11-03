@@ -591,6 +591,7 @@ Rectangle {
                         }
 
                         QGCButton {
+<<<<<<< HEAD
                             Layout.fillWidth: true
                             checkable: true
                             checked: QGroundControl.videoManager.hudEnabled
@@ -598,6 +599,31 @@ Rectangle {
                             onToggled: QGroundControl.videoManager.setHudEnabled(checked)
                         }
 
+=======
+                            Layout.fillWidth:   true
+                            text:               qsTr("Format")
+                            visible:            true //_cameraStorageSupported
+                            onClicked:          formatPrompt.open()
+                            // MessageDialog {
+                            //     id:                 formatPrompt
+                            //     title:              qsTr("Format Camera Storage")
+                            //     text:               qsTr("Confirm erasing all files?")
+                            //     buttons:            MessageDialog.Yes | MessageDialog.No
+
+                            //     onButtonClicked: function (button, role) {
+                            //         switch (button) {
+                            //         case MessageDialog.Yes:
+                            //             _camera.formatCard()
+                            //             formatPrompt.close()
+                            //             break;
+                            //         case MessageDialog.No:
+                            //             formatPrompt.close()
+                            //             break;
+                            //         }
+                            //     }
+                            // }
+                        }
+>>>>>>> 2ec41fb76... HUD
                     }
                 }
             }
