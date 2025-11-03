@@ -336,7 +336,7 @@ Rectangle {
                         flow:   GridLayout.TopToBottom
                         rows:   dynamicRows + _camera.activeSettings.length
 
-                        property int dynamicRows: 10
+                        property int dynamicRows: 11
 
                         // First column
                         QGCLabel {
@@ -404,6 +404,12 @@ Rectangle {
                         QGCLabel {
                             text:               qsTr("Storage")
                             visible:            _cameraStorageSupported
+                            onVisibleChanged:   gridLayout.dynamicRows += visible ? 1 : -1
+                        }
+
+                        QGCLabel {
+                            text:               qsTr("HUD")
+                            visible:            _camera.hasVideoStream
                             onVisibleChanged:   gridLayout.dynamicRows += visible ? 1 : -1
                         }
 
@@ -582,6 +588,31 @@ Rectangle {
                                     }
                                 }
                             }
+                        }
+
+                        QGCButton {
+                            Layout.fillWidth:   true
+                            text:               qsTr("Format")
+                            visible:            true //_cameraStorageSupported
+                            onClicked:          formatPrompt.open()
+                            // MessageDialog {
+                            //     id:                 formatPrompt
+                            //     title:              qsTr("Format Camera Storage")
+                            //     text:               qsTr("Confirm erasing all files?")
+                            //     buttons:            MessageDialog.Yes | MessageDialog.No
+
+                            //     onButtonClicked: function (button, role) {
+                            //         switch (button) {
+                            //         case MessageDialog.Yes:
+                            //             _camera.formatCard()
+                            //             formatPrompt.close()
+                            //             break;
+                            //         case MessageDialog.No:
+                            //             formatPrompt.close()
+                            //             break;
+                            //         }
+                            //     }
+                            // }
                         }
                     }
                 }
