@@ -12,8 +12,6 @@ import QtQuick
 import QGroundControl
 import QGroundControl.Controls
 
-
-
 Item {
     id: _root
 
@@ -257,4 +255,20 @@ Item {
         id: obstacleDistance
         showText: pipState.state === pipState.fullState
     }
+
+    CustomHudOverlay {
+        id: customHud
+        x: 0
+        y: 0
+        width:  _root.width
+        height: _root.height
+        z: 9999
+        visible: QGroundControl.videoManager.decoding
+
+        vehicle: QGroundControl.multiVehicleManager.activeVehicle
+        camera:  videoStreaming._camera
+        pipState: _root.pipState
+    }
+
+
 }
