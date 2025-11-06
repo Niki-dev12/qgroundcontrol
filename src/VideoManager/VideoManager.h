@@ -49,6 +49,7 @@ class VideoManager : public QObject
     Q_PROPERTY(QSize    videoSize               READ videoSize                                  NOTIFY videoSizeChanged)
     Q_PROPERTY(QString  imageFile               READ imageFile                                  NOTIFY imageFileChanged)
     Q_PROPERTY(QString  uvcVideoSourceID        READ uvcVideoSourceID                           NOTIFY uvcVideoSourceIDChanged)
+    Q_PROPERTY(bool hudEnabled                  READ hudEnabled                                 WRITE setHudEnabled NOTIFY hudEnabledChanged)
 
 public:
     explicit VideoManager(QObject *parent = nullptr);
@@ -61,6 +62,8 @@ public:
     Q_INVOKABLE void startVideo();
     Q_INVOKABLE void stopRecording();
     Q_INVOKABLE void stopVideo();
+
+    Q_INVOKABLE void setHudEnabled(bool enabled);
 
     void init(QQuickWindow *rootWindow);
     void cleanup();
@@ -84,6 +87,7 @@ public:
     static bool gstreamerEnabled();
     static bool qtmultimediaEnabled();
     static bool uvcEnabled();
+    bool hudEnabled() const {return _hudEnabled; }
 
 signals:
     void aspectRatioChanged();
@@ -100,6 +104,8 @@ signals:
     void streamingChanged();
     void uvcVideoSourceIDChanged();
     void videoSizeChanged();
+
+    void hudEnabledChanged();
 
 private slots:
     void _communicationLostChanged(bool communicationLost);
@@ -132,6 +138,8 @@ private:
     QString _imageFile;
     QString _uvcVideoSourceID;
     Vehicle *_activeVehicle = nullptr;
+
+    QAtomicInteger<bool> _hudEnabled = true;
 };
 
 /*===========================================================================*/
