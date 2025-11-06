@@ -264,10 +264,14 @@ Item {
         height: _root.height
         z: 9999
 <<<<<<< HEAD
+<<<<<<< HEAD
         visible: QGroundControl.videoManager.decoding && QGroundControl.videoManager.hudEnabled 
 =======
         visible: QGroundControl.videoManager.decoding
 >>>>>>> 2ec41fb76... HUD
+=======
+        visible: QGroundControl.videoManager.decoding && QGroundControl.videoManager.hudEnabled 
+>>>>>>> 8dd9c85ab... hud
 
         vehicle: QGroundControl.multiVehicleManager.activeVehicle
         camera:  videoStreaming._camera

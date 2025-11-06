@@ -592,11 +592,15 @@ Rectangle {
 
                         QGCButton {
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> 8dd9c85ab... hud
                             Layout.fillWidth: true
                             checkable: true
                             checked: QGroundControl.videoManager.hudEnabled
                             text: checked ? qsTr("HUD off") : qsTr("HUD on")
                             onToggled: QGroundControl.videoManager.setHudEnabled(checked)
+<<<<<<< HEAD
                         }
 
 =======
@@ -624,6 +628,10 @@ Rectangle {
                             // }
                         }
 >>>>>>> 2ec41fb76... HUD
+=======
+                        }
+
+>>>>>>> 8dd9c85ab... hud
                     }
                 }
             }
