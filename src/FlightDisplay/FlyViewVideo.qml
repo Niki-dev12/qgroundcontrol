@@ -263,7 +263,7 @@ Item {
         width:  _root.width
         height: _root.height
         z: 9999
-        visible: QGroundControl.videoManager.decoding
+        visible: QGroundControl.videoManager.decoding && QGroundControl.videoManager.hudEnabled 
 
         vehicle: QGroundControl.multiVehicleManager.activeVehicle
         camera:  videoStreaming._camera
