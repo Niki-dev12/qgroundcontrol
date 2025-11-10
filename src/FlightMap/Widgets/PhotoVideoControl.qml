@@ -14,12 +14,23 @@ import QtQuick.Controls
 import QtQuick.Dialogs
 
 import QGroundControl
+
+import QGroundControl.Controls
+import QtQuick
+import QtPositioning
+import QtQuick.Layouts
+import QtQuick.Controls
+import QtQuick.Dialogs
+
+import QGroundControl
 import QGroundControl.ScreenTools
 import QGroundControl.Controls
 import QGroundControl.Palette
 import QGroundControl.Vehicle
 import QGroundControl.Controllers
 import QGroundControl.FactSystem
+import QGroundControl.FactControls
+
 import QGroundControl.FactControls
 
 Rectangle {
@@ -165,13 +176,7 @@ Rectangle {
                     border.width:       3
 
                     Rectangle {
-                        // anchors.centerIn snaps to integer coordinates, which
-                        // depending on DPI can throw the centering off.
-                        // Setting alignWhenCentered to false avoids this issue.
-                        anchors {
-                            centerIn:           parent
-                            alignWhenCentered:  false
-                        }
+                        anchors.centerIn:   parent
                         width:              parent.width * (_isShootingInCurrentMode ? 0.5 : 0.75)
                         height:             width
                         radius:             _isShootingInCurrentMode ? 0 : width * 0.5
@@ -284,7 +289,7 @@ Rectangle {
                             onClicked: {
                                 _camera.trackingEnabled = !_camera.trackingEnabled;
                                 if (!_camera.trackingEnabled) {
-                                    !camera.stopTracking()
+                                    _camera.stopTracking()
                                 }
                             }
                         }
@@ -591,47 +596,13 @@ Rectangle {
                         }
 
                         QGCButton {
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> 8dd9c85ab... hud
                             Layout.fillWidth: true
                             checkable: true
                             checked: QGroundControl.videoManager.hudEnabled
                             text: checked ? qsTr("HUD off") : qsTr("HUD on")
                             onToggled: QGroundControl.videoManager.setHudEnabled(checked)
-<<<<<<< HEAD
                         }
 
-=======
-                            Layout.fillWidth:   true
-                            text:               qsTr("Format")
-                            visible:            true //_cameraStorageSupported
-                            onClicked:          formatPrompt.open()
-                            // MessageDialog {
-                            //     id:                 formatPrompt
-                            //     title:              qsTr("Format Camera Storage")
-                            //     text:               qsTr("Confirm erasing all files?")
-                            //     buttons:            MessageDialog.Yes | MessageDialog.No
-
-                            //     onButtonClicked: function (button, role) {
-                            //         switch (button) {
-                            //         case MessageDialog.Yes:
-                            //             _camera.formatCard()
-                            //             formatPrompt.close()
-                            //             break;
-                            //         case MessageDialog.No:
-                            //             formatPrompt.close()
-                            //             break;
-                            //         }
-                            //     }
-                            // }
-                        }
->>>>>>> 2ec41fb76... HUD
-=======
-                        }
-
->>>>>>> 8dd9c85ab... hud
                     }
                 }
             }
