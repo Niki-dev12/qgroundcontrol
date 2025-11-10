@@ -1,6 +1,7 @@
 import QtQuick
 import QGroundControl
 import QGroundControl.Controls
+import QGroundControl.ScreenTools
 
 Item {
     id: hud
@@ -198,7 +199,7 @@ Item {
                 // ---------------------------------------------
                 ctx.save()
                 ctx.translate(width/2, horizonY)
-                ctx.rotate(roll() * Math.PI/180)
+                ctx.rotate(-roll() * Math.PI/180)
                 ctx.translate(0, -pitch() * 2.0)
 
                 ctx.strokeStyle = cGreen
@@ -612,8 +613,8 @@ Item {
 
                     ctx.beginPath()
                     ctx.moveTo(cx, cy - len/4)
-                    ctx.lineTo(cx - 6, cy)
-                    ctx.lineTo(cx + 6, cy)
+                    ctx.lineTo(cx - 9, cy)
+                    ctx.lineTo(cx + 9, cy)
                     ctx.closePath()
                     ctx.fillStyle = "rgba(180,255,26,0.5)"; ctx.fill()
 
@@ -630,31 +631,40 @@ Item {
             visible: bottomCompass.showLaunchIndicator()
             width: 22; height: 22
             radius: width/2
-            color: "transparent"
-            border.color: bottomCompass.compassColor
+            color: "red"
+            border.color: "red" //bottomCompass.compassColor
             border.width: 3
 
-            property real _a: bottomCompass.launchHeadingDeg
+            // helpers
+            function norm360(d) { return ((d % 360) + 360) % 360 }
+
+            // Use relative angle so it "follows" the dial rotation
+            readonly property real relDeg: {
+                if (!bottomCompass.showLaunchIndicator()) return NaN
+                // dial is rotated by -heading -> compensate by subtracting heading
+                return norm360(bottomCompass.launchHeadingDeg - bottomCompass.headingDeg)
+            }
+            readonly property real relRad: relDeg * Math.PI / 180.0
+
             x: {
                 if (!visible) return 0
-                const a = _a * Math.PI / 180.0
-                const cx = bottomCompass.width / 2
-                return cx + bottomCompass.compassRadius * Math.sin(a) - width/2
+                const cx = bottomCompass.width  / 2
+                return cx + bottomCompass.compassRadius * Math.sin(relRad) - width/2
             }
             y: {
                 if (!visible) return 0
-                const a = _a * Math.PI / 180.0
                 const cy = bottomCompass.height / 2
-                return cy - bottomCompass.compassRadius * Math.cos(a) - height/2
+                return cy - bottomCompass.compassRadius * Math.cos(relRad) - height/2
             }
 
             QGCLabel {
                 anchors.centerIn: parent
                 text: "L"
                 font.bold: true
-                color: bottomCompass.compassColor
+                color: "black" //bottomCompass.compassColor
             }
         }
+
 
         Repeater {
             id: gimbalRep
@@ -666,46 +676,75 @@ Item {
                 width: bottomCompass.width
                 height: bottomCompass.height
 
-                function norm360(d) {
-                    return ((d % 360) + 360) % 360
+                // --- helpers ---
+                function norm360(d) { return ((d % 360) + 360) % 360 }
+                function wrap180(d) { let a = norm360(d); return (a > 180) ? a - 360 : a }
+
+                // If your firmware reports radians, set this to true.
+                property bool absYawIsRadians: false
+
+                // Optional fixed mount offset (deg) if the camera is not aligned with body x-axis
+                property real mountYawOffsetDeg: 0
+
+                // Current absolute gimbal yaw in degrees (north-referenced, CW+), normalized.
+                // Works whether `absoluteYaw` is a Fact or a plain number.
+                readonly property real absYawDegNow: {
+                    if (!object) return NaN
+                    // hud._val handles {value},{rawValue}, plain number, NaN
+                    let v = hud._val(object.absoluteYaw)
+                    if (!Number.isFinite(v)) return NaN
+                    if (absYawIsRadians) v = v * 180 / Math.PI
+                    return norm360(v)
                 }
-                function wrap180(d) {
-                    let a = ((d + 180) % 360 + 360) % 360
-                    return a - 180
-                }
 
-                property real _lastGoodAbsYaw: 0
-                property bool _haveLast: false
+                // Current drone heading (deg, 0..360)
+                readonly property real headDegNow: Number.isFinite(bottomCompass.headingDeg)
+                                                ? norm360(bottomCompass.headingDeg) : NaN
 
-                readonly property bool _absYawValid: object && object.absoluteYaw && Number.isFinite(object.absoluteYaw.rawValue)
-                readonly property real _absYawDeg: _absYawValid ? object.absoluteYaw.rawValue
-                                                            : (_haveLast ? _lastGoodAbsYaw : 0)
-
-                readonly property real droneHeading: norm360(bottomCompass.headingDeg)
-
-                readonly property real _rel1: wrap180(norm360(_absYawDeg) - droneHeading)
-                readonly property real _rel2: wrap180(norm360(_absYawDeg + 90) - droneHeading)
-
-                property real _lastRel: 0
+                // Relative angle the wedge should point to (deg, -180..180, 0 = forward/up on dial)
                 readonly property real relAngleDeg: {
-                    const cand1 = _rel1
-                    const cand2 = _rel2
-                    function dist(a,b){ return Math.abs(wrap180(a-b)) }
-                    const chosen = (dist(cand1, _lastRel) <= dist(cand2, _lastRel)) ? cand1 : cand2
-                    _lastRel = chosen
-                    return chosen
+                    if (!Number.isFinite(absYawDegNow) || !Number.isFinite(headDegNow)) return 0
+                    return wrap180(absYawDegNow + mountYawOffsetDeg - headDegNow)
                 }
 
-                on_AbsYawDegChanged: {
-                    if (_absYawValid) { _lastGoodAbsYaw = _absYawDeg; _haveLast = true }
-                }
+                // Repaint when relAngleDeg changes
+                onRelAngleDegChanged: gimbalCanvas.requestPaint()
 
 
-                visible: vehicle
-                        && QGroundControl.settingsManager.gimbalControllerSettings.showAzimuthIndicatorOnMap.rawValue
 
-                opacity: object === vehicle.gimbalController.activeGimbal ? 1.0 : 0.4
+                // // --- helpers ---
+                // function norm360(d) { return ((d % 360) + 360) % 360 }
+                // function wrap180(d) { let a = ((d + 180) % 360 + 360) % 360; return a - 180 }
+                // function dist(a,b){ return Math.abs(wrap180(a-b)) }
 
+                // // Latching for absolute yaw so we don't snap to 0 when it blips
+                // property real _lastGoodAbsYaw: 0
+                // property bool  _haveLast: false
+
+                // // State we control imperatively
+                // property real _lastRel: 0
+                // property real relAngleDeg: 0   // updated only via updateRel()
+
+                // // Inputs
+                // readonly property bool _absYawValid: object && object.absoluteYaw && Number.isFinite(object.absoluteYaw.rawValue)
+                // readonly property real _absYawDeg: _absYawValid ? object.absoluteYaw.rawValue
+                //                                             : (_haveLast ? _lastGoodAbsYaw : 0)
+                // readonly property real droneHeading: norm360(bottomCompass.headingDeg)
+
+                // function updateRel() {
+                //     const absYaw = norm360(_absYawDeg)
+                //     const head   = droneHeading
+
+                //     // Two candidates (+ optional 90° convention)
+                //     const cand1 = wrap180(absYaw - head)
+                //     const cand2 = wrap180(absYaw + 90 - head)
+
+                //     const chosen = (dist(cand1, _lastRel) <= dist(cand2, _lastRel)) ? cand1 : cand2
+                //     relAngleDeg = chosen
+                //     _lastRel = chosen
+                // }
+
+                // Main drawing
                 Canvas {
                     id: gimbalCanvas
                     anchors.fill: parent
@@ -719,8 +758,8 @@ Item {
                         const cy = height / 2
                         const r  = bottomCompass.compassRadius - 1.5
 
-                        let aCenter = (gimbalItem.relAngleDeg) * Math.PI / 180.0
-                        aCenter -= Math.PI / 2
+                        // Convert: 0° relative = up; canvas 0 rad is +X, so subtract π/2
+                        const aCenter = (gimbalItem.relAngleDeg) * Math.PI/180 - Math.PI/2
 
                         const spanDeg = 10
                         const spanRad = spanDeg * Math.PI / 180.0
@@ -745,12 +784,46 @@ Item {
                         ctx.lineTo(cx + Math.cos(a2) * r, cy + Math.sin(a2) * r)
                         ctx.stroke()
                     }
+
+                    // Recompute + repaint when inputs change
+                    Connections {
+                        target: bottomCompass
+                        ignoreUnknownSignals: true
+                        function onHeadingDegChanged() { gimbalItem.updateRel(); gimbalCanvas.requestPaint() }
+                    }
+                    Connections {
+                        target: object && object.absoluteYaw ? object.absoluteYaw : null
+                        ignoreUnknownSignals: true
+                        function onRawValueChanged() {
+                            if (gimbalItem._absYawValid) {
+                                gimbalItem._lastGoodAbsYaw = object.absoluteYaw.rawValue
+                                gimbalItem._haveLast = true
+                            }
+                            gimbalItem.updateRel()
+                            gimbalCanvas.requestPaint()
+                        }
+                    }
+                    Connections {
+                        target: gimbalItem
+                        ignoreUnknownSignals: true
+                        function onRelAngleDegChanged() { gimbalCanvas.requestPaint() }
+                    }
+
+                    onWidthChanged:  requestPaint()
+                    onHeightChanged: requestPaint()
+                    onVisibleChanged: if (visible) requestPaint()
                 }
 
-                Connections { target: bottomCompass; function onHeadingDegChanged() { gimbalCanvas.requestPaint() } }
-                Connections { target: object && object.absoluteYaw ? object.absoluteYaw : null
-                            function onRawValueChanged() { gimbalCanvas.requestPaint() } }
+                // Initial compute
+                Component.onCompleted: { updateRel(); gimbalCanvas.requestPaint() }
+
+                // Visibility + opacity as before
+                visible: vehicle
+                    && QGroundControl.settingsManager.gimbalControllerSettings.showAzimuthIndicatorOnMap.rawValue
+                opacity: object === vehicle.gimbalController.activeGimbal ? 1.0 : 0.4
             }
+
+
         }
     }
 }

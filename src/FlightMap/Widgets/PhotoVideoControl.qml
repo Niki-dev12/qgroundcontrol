@@ -14,12 +14,23 @@ import QtQuick.Controls
 import QtQuick.Dialogs
 
 import QGroundControl
+
+import QGroundControl.Controls
+import QtQuick
+import QtPositioning
+import QtQuick.Layouts
+import QtQuick.Controls
+import QtQuick.Dialogs
+
+import QGroundControl
 import QGroundControl.ScreenTools
 import QGroundControl.Controls
 import QGroundControl.Palette
 import QGroundControl.Vehicle
 import QGroundControl.Controllers
 import QGroundControl.FactSystem
+import QGroundControl.FactControls
+
 import QGroundControl.FactControls
 
 Rectangle {
@@ -165,13 +176,7 @@ Rectangle {
                     border.width:       3
 
                     Rectangle {
-                        // anchors.centerIn snaps to integer coordinates, which
-                        // depending on DPI can throw the centering off.
-                        // Setting alignWhenCentered to false avoids this issue.
-                        anchors {
-                            centerIn:           parent
-                            alignWhenCentered:  false
-                        }
+                        anchors.centerIn:   parent
                         width:              parent.width * (_isShootingInCurrentMode ? 0.5 : 0.75)
                         height:             width
                         radius:             _isShootingInCurrentMode ? 0 : width * 0.5
