@@ -21,6 +21,8 @@ Item {
 
     property int    _track_rec_x:       0
     property int    _track_rec_y:       0
+    property real telemetryBottomInset: 0
+    property bool videoMinimized: false
 
     PipState {
         id:         videoPipState
@@ -264,7 +266,13 @@ Item {
         width:  _root.width
         height: _root.height
         z: 9999
-        visible: QGroundControl.videoManager.decoding && QGroundControl.videoManager.hudEnabled 
+        visible: true //QGroundControl.videoManager.decoding && QGroundControl.videoManager.hudEnabled 
+
+        bottomUiInset:  videoControl.telemetryBottomInset
+        videoMinimized: videoControl.videoMinimized
+
+        onVideoMinimizedChanged: console.log("[HUD] videoMinimized ->", videoMinimized)
+
 
         vehicle: QGroundControl.multiVehicleManager.activeVehicle
         camera:  videoStreaming._camera

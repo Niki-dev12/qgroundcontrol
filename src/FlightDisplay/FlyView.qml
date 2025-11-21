@@ -64,6 +64,9 @@ Item {
     property real   _fullItemZorder:    0
     property real   _pipItemZorder:     QGroundControl.zOrderWidgets
 
+    readonly property real _layoutMargin: ScreenTools.defaultFontPixelWidth
+    readonly property real _layoutSpacing: ScreenTools.defaultFontPixelWidth / 2
+
     function _calcCenterViewPort() {
         var newToolInset = Qt.rect(0, 0, width, height)
         toolstrip.adjustToolInset(newToolInset)
@@ -105,6 +108,30 @@ Item {
         FlyViewVideo {
             id:         videoControl
             pipView:    _pipView
+
+            telemetryBottomInset: (
+                widgetLayer.visible
+                ? (widgetLayer.bottomRightRowLayout.telemetryBarHeight + _layoutMargin)
+                : 0
+            )
+
+                property bool _minRaw: (_pipView && _pipView.show && !QGroundControl.videoManager.fullScreen)
+
+                property bool videoMinimized: false
+
+                Timer {
+                    id: _minDebounce
+                    interval: 150
+                    repeat: false
+                    onTriggered: {
+                        if (videoControl.videoMinimized !== videoControl._minRaw) {
+                            videoControl.videoMinimized = videoControl._minRaw
+                            console.log("[FlyViewVideo] videoMinimized ->", videoControl.videoMinimized)
+                        }
+                    }
+                }
+                on_MinRawChanged: _minDebounce.restart()
+
         }
 
         PipView {

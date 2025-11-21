@@ -15,6 +15,14 @@ Item {
 
     property int hudCompassMode: 1
 
+    required property real bottomUiInset
+    property bool  videoMinimized: false
+
+    property real effectiveBottomInset: videoMinimized ? (hud.pad * 3) : (bottomUiInset + 8)
+
+    onEffectiveBottomInsetChanged:
+        console.log("[HUD] effectiveBottomInset ->", effectiveBottomInset)
+
     // ---- Style ----
     readonly property color cGreen: "#11C900"
     readonly property color cFill : "#112511"
@@ -69,6 +77,7 @@ Item {
         return (f && typeof f === "object" && (f.value !== undefined || f.rawValue !== undefined)) ? f : null
     }
 
+    // ---------- Terrain elevation ---------
     component TerrainAheadProfile : Item {
         property var  vehicle
         property real aheadDistanceM: 500
@@ -82,6 +91,14 @@ Item {
         property color cWarn:  "#ff6b6b"
         property color cText:  "#ffffff"
         property color cVehicle: "#ADFF2F"
+
+        property color cWarnUnder:  "#ff3b30"
+        property color cWarnAhead:  "#ff9500"
+
+        property real warnAheadAGLM: 10
+
+        implicitWidth: 0
+        implicitHeight: 0
 
         function _finite(n) { return Number.isFinite(n) }
         function _val(x) {
@@ -106,10 +123,8 @@ Item {
             id: sampler
             vehicle:            terrainStrip.vehicle
             aheadDistanceMeters: terrainStrip.aheadDistanceM
-            // stepMeters:          terrainStrip.stepM
             hz:                  terrainStrip.hz
         }
-
 
         readonly property real aglNow: {
             const t = sampler.terrainNowAMSL
@@ -117,7 +132,28 @@ Item {
             if (_finite(altRelNow)) return altRelNow
             return NaN
         }
+
+        // RED
         readonly property bool dangerUnder: _finite(aglNow) && aglNow < warnUnderAGLM
+
+        // ORANGE
+        readonly property bool dangerAhead: {
+            const pts = sampler.points || []
+            if (!_finite(altAMSLNow) || !pts.length) return false
+
+            const minSkipDist = 5
+            for (let i = 0; i < pts.length; i++) {
+                const p = pts[i]
+                if (!_finite(p.elevAMSL)) continue
+                if (p.d <= minSkipDist) continue
+
+                const agl = altAMSLNow - p.elevAMSL
+                if (_finite(agl) && agl < warnAheadAGLM) {
+                    return true
+                }
+            }
+            return false
+        }
 
         property real _minH: NaN
         property real _maxH: NaN
@@ -163,70 +199,124 @@ Item {
         }
 
         Canvas {
+            id: hatch
+            width: 12; height: 12
+            renderTarget:  Canvas.FramebufferObject
+            renderStrategy: Canvas.Threaded
+            onPaint: {
+                const c = getContext("2d")
+                c.clearRect(0,0,width,height)
+                c.strokeStyle = "#11C900"
+                c.globalAlpha = 0.25
+                c.lineWidth = 1.0
+                c.beginPath()
+                c.moveTo(0, height);      c.lineTo(width, 0)
+                c.moveTo(-width/2, height); c.lineTo(width/2, 0)
+                c.stroke()
+            }
+        }
+
+        Canvas {
             id: canvas
             anchors.fill: parent
             antialiasing: true
+            implicitWidth: 0
+            implicitHeight: 0
 
             onPaint: {
                 const ctx = getContext("2d")
                 ctx.clearRect(0,0,width,height)
 
+                // background
                 ctx.fillStyle = "rgba(0,0,0,0.40)"
                 ctx.fillRect(0,0,width,height)
 
                 const top = 6
                 const bot = height - 18
 
+                function xForD(d) { return d / Math.max(1, aheadDistanceM) * width }
+                function isF(n) { return Number.isFinite(n) }
+
+                const terrainNow = sampler.terrainNowAMSL
+                const aglNowCalc = (isF(altAMSLNow) && isF(terrainNow)) ? (altAMSLNow - terrainNow)
+                                : (isF(altRelNow) ? altRelNow : NaN)
+
+                // Danger rules:
+                // - RED if ground under drone < 10 m AGL
+                // - ORANGE if AGL at 500 m ahead < 10 m
+                const pts = sampler.points || []
+
+                function aglAtDistance(targetM) {
+                    if (!isF(altAMSLNow) || !pts.length) return NaN
+                    let best = null, bestDiff = 1e12
+                    for (let i=0; i<pts.length; i++) {
+                        const p = pts[i]
+                        if (!isF(p.elevAMSL)) continue
+                        const diff = Math.abs(p.d - targetM)
+                        if (diff < bestDiff) { bestDiff = diff; best = p }
+                    }
+                    if (!best) return NaN
+                    return altAMSLNow - best.elevAMSL
+                }
+
+                const aglUnder     = aglNow
+                const redDanger    = dangerUnder
+                const orangeDanger = !redDanger && dangerAhead
+
+                const RED    = "#ff3b30"
+                const ORANGE = "#ff9500"
+                const profileColor = redDanger ? RED : (orangeDanger ? ORANGE : cLine)
+
                 // AMSL baseline
                 ctx.setLineDash([4,4])
                 ctx.strokeStyle = "rgba(255,255,255,0.18)"
                 ctx.lineWidth = 1
                 let y0 = bot
-                if (_finite(altAMSLNow)) {
+                if (isF(altAMSLNow)) {
                     y0 = _computeYFromAMSL(altAMSLNow, top, bot)
                     ctx.beginPath(); ctx.moveTo(0,y0); ctx.lineTo(width,y0); ctx.stroke()
                 }
                 ctx.setLineDash([])
 
-                const pts = sampler.points || []
                 if (!pts.length) return
-                const aheadDistanceM = terrainStrip.aheadDistanceM
 
-                function xForD(d) { return d / Math.max(1, aheadDistanceM) * width }
-
-                ctx.beginPath()
-                ctx.moveTo(0, bot)
-                for (let i=0; i<pts.length; i++) {
-                    const s = pts[i]
-                    const x = xForD(s.d)
-                    const y = _finite(s.elevAMSL) ? _computeYFromAMSL(s.elevAMSL, top, bot) : bot
-                    ctx.lineTo(x, y)
+                ctx.beginPath();
+                ctx.moveTo(0, bot);
+                for (let i = 0; i < pts.length; i++) {
+                    const x = xForD(pts[i].d);
+                    const y = isF(pts[i].elevAMSL) ? _computeYFromAMSL(pts[i].elevAMSL, top, bot) : bot;
+                    ctx.lineTo(x, y);
                 }
-                ctx.lineTo(width, bot)
-                ctx.closePath()
+                ctx.lineTo(width, bot);
+                ctx.closePath();
 
-                let forwardDanger = false
-                if (_finite(altAMSLNow)) {
-                    for (let i=0; i<pts.length; i++) {
-                        const s = pts[i]
-                        if (_finite(s.elevAMSL) && (altAMSLNow - s.elevAMSL) <= warnAGLM) { forwardDanger = true; break }
-                    }
-                }
-                const danger = dangerUnder || forwardDanger
+                ctx.save()
+                ctx.clip()
+                ctx.globalAlpha = 0.45
+                ctx.strokeStyle = profileColor
+                ctx.lineWidth = 1.0
 
-                ctx.fillStyle = danger ? cWarn : cFill
-                ctx.globalAlpha = 0.35; ctx.fill(); ctx.globalAlpha = 1
+                ctx.save()
+                ctx.clip()
+
+                const pattern = ctx.createPattern(hatch, "repeat")
+                ctx.globalAlpha = redDanger ? 0.55 : (orangeDanger ? 0.50 : 0.45)
+                ctx.fillStyle = pattern
+                ctx.fillRect(0, 0, width, height)
+
+                ctx.restore()
+
+                ctx.restore()
 
                 ctx.beginPath()
                 let first = true
                 for (let i=0; i<pts.length; i++) {
-                    const s = pts[i]
-                    const x = xForD(s.d)
-                    const y = _finite(s.elevAMSL) ? _computeYFromAMSL(s.elevAMSL, top, bot) : bot
+                    const x = xForD(pts[i].d)
+                    const y = isF(pts[i].elevAMSL) ? _computeYFromAMSL(pts[i].elevAMSL, top, bot) : bot
                     if (first) { ctx.moveTo(x, y); first = false } else { ctx.lineTo(x, y) }
                 }
                 ctx.lineWidth = 2
-                ctx.strokeStyle = danger ? cWarn : cLine
+                ctx.strokeStyle = profileColor
                 ctx.stroke()
 
                 ctx.fillStyle = "rgba(255,255,255,0.70)"
@@ -237,7 +327,7 @@ Item {
                     ctx.fillText(m.toString(), x, height-12)
                 }
 
-                if (_finite(altAMSLNow)) {
+                if (isF(altAMSLNow)) {
                     const glyphX = 10
                     const glyphY = y0
                     const w = 12, h = 10
@@ -255,9 +345,8 @@ Item {
                     ctx.fillStyle = cVehicle
                     ctx.fill()
 
-                    const amslTxt = Math.round(altAMSLNow) + " m AMSL"
-                    const aglTxt  = _finite(altRelNow) ? Math.round(altRelNow) + " m AGL" : "— AGL"
-                    const label = amslTxt + "   " + aglTxt
+                    const aglTxt = isF(aglUnder) ? (Math.round(aglUnder) + " m AGL") : "— AGL"
+                    const label = aglTxt
 
                     ctx.font = "bold 12px sans-serif"
                     ctx.textAlign = "left"
@@ -275,26 +364,28 @@ Item {
                     ctx.fillRect(boxX, boxY, rectW, rectH)
                     ctx.globalAlpha = 1.0
                     ctx.lineWidth = 1.5
-                    ctx.strokeStyle = cLine
+                    ctx.strokeStyle = profileColor
                     ctx.strokeRect(boxX+0.5, boxY+0.5, rectW-1, rectH-1)
 
                     ctx.fillStyle = cText
                     ctx.fillText(label, boxX + padX, boxY + rectH - padY - 2)
                 }
 
-                // AGL at far point
-                if (_finite(altAMSLNow) && pts.length) {
+                if (isF(altAMSLNow) && pts.length) {
                     const last = pts[pts.length-1]
-                    if (_finite(last.elevAMSL)) {
-                        const agl = Math.round(altAMSLNow - last.elevAMSL)
+                    if (isF(last.elevAMSL)) {
+                        const aglFar = Math.round(altAMSLNow - last.elevAMSL)
                         const yAC = _computeYFromAMSL(altAMSLNow, top, bot)
                         const xEnd = xForD(last.d)
-                        ctx.setLineDash([3,3]); ctx.strokeStyle="#ffffff"; ctx.lineWidth=1.5
+                        ctx.setLineDash([3,3])
+                        ctx.strokeStyle = orangeDanger ? ORANGE : "#ffffff"
+                        ctx.lineWidth = 1.5
                         ctx.beginPath(); ctx.moveTo(xEnd, yAC); ctx.lineTo(xEnd, bot); ctx.stroke()
                         ctx.setLineDash([])
 
-                        ctx.fillStyle="#ffffff"; ctx.font="bold 12px sans-serif"; ctx.textAlign="right"; ctx.textBaseline="bottom"
-                        ctx.fillText("AGL @ " + Math.round(last.d) + " m: " + agl + " m",
+                        ctx.fillStyle = orangeDanger ? ORANGE : "#ffffff"
+                        ctx.font = "bold 12px sans-serif"; ctx.textAlign = "right"; ctx.textBaseline = "bottom"
+                        ctx.fillText("AGL " + aglFar + " m",
                                     Math.min(width-6, xEnd), Math.max(12, y0-4))
                     }
                 }
@@ -439,7 +530,7 @@ Item {
                 ctx.save()
                 ctx.translate(width/2, horizonY)
                 ctx.rotate(-roll() * Math.PI/180)
-                ctx.translate(0, -pitch() * 2.0)
+                ctx.translate(0, pitch() * 2.0)
 
                 ctx.strokeStyle = cGreen
                 ctx.lineWidth = thick
@@ -847,8 +938,8 @@ Item {
 
                     ctx.beginPath()
                     ctx.moveTo(cx, cy - len/4)
-                    ctx.lineTo(cx - 9, cy)
-                    ctx.lineTo(cx + 9, cy)
+                    ctx.lineTo(cx - 6, cy)
+                    ctx.lineTo(cx + 6, cy)
                     ctx.closePath()
                     ctx.fillStyle = "rgba(180,255,26,0.5)"; ctx.fill()
 
@@ -859,44 +950,44 @@ Item {
             }
         }
 
-        // 3) launch/home indicator and gimbal azimuth
         Rectangle {
             id: launchIndicator
             visible: bottomCompass.showLaunchIndicator()
-            width: 22; height: 22
-            radius: width/2
+            width: 22
+            height: 22
+            radius: width / 2
             color: "red"
-            border.color: "red" //bottomCompass.compassColor
-            border.width: 3
 
-            function norm360(d) { return ((d % 360) + 360) % 360 }
-
-            readonly property real relDeg: {
-                if (!bottomCompass.showLaunchIndicator()) return NaN
-                return norm360(bottomCompass.launchHeadingDeg - bottomCompass.headingDeg)
+            property real _relAngleDeg: {
+                if (!visible || !Number.isFinite(bottomCompass.launchHeadingDeg))
+                    return 0
+                var a = bottomCompass.launchHeadingDeg - bottomCompass.headingDeg
+                a = ((a % 360) + 360) % 360
+                return a
             }
-            readonly property real relRad: relDeg * Math.PI / 180.0
 
             x: {
                 if (!visible) return 0
-                const cx = bottomCompass.width  / 2
-                return cx + bottomCompass.compassRadius * Math.sin(relRad) - width/2
+                const a = _relAngleDeg * Math.PI / 180.0
+                const cx = bottomCompass.width / 2
+                return cx + bottomCompass.compassRadius * Math.sin(a) - width / 2
             }
             y: {
                 if (!visible) return 0
+                const a = _relAngleDeg * Math.PI / 180.0
                 const cy = bottomCompass.height / 2
-                return cy - bottomCompass.compassRadius * Math.cos(relRad) - height/2
+                return cy - bottomCompass.compassRadius * Math.cos(a) - height / 2
             }
 
             QGCLabel {
                 anchors.centerIn: parent
                 text: "L"
                 font.bold: true
-                color: "black" //bottomCompass.compassColor
+                color: "black"
             }
         }
 
-
+        // 3) launch/home indicator
         Repeater {
             id: gimbalRep
             model: vehicle && vehicle.gimbalController ? vehicle.gimbalController.gimbals : []
@@ -907,34 +998,45 @@ Item {
                 width: bottomCompass.width
                 height: bottomCompass.height
 
-                // --- helpers ---
-                function norm360(d) { return ((d % 360) + 360) % 360 }
-                function wrap180(d) { let a = norm360(d); return (a > 180) ? a - 360 : a }
+                function norm360(d) {
+                    return ((d % 360) + 360) % 360
+                }
+                function wrap180(d) {
+                    let a = ((d + 180) % 360 + 360) % 360
+                    return a - 180
+                }
 
-                property bool absYawIsRadians: false
+                property real _lastGoodAbsYaw: 0
+                property bool _haveLast: false
+
+                readonly property bool _absYawValid: object && object.absoluteYaw && Number.isFinite(object.absoluteYaw.rawValue)
+                readonly property real _absYawDeg: _absYawValid ? object.absoluteYaw.rawValue
+                                                            : (_haveLast ? _lastGoodAbsYaw : 0)
+
+                readonly property real droneHeading: norm360(bottomCompass.headingDeg)
+
+                readonly property real _rel1: wrap180(norm360(_absYawDeg) - droneHeading)
+                readonly property real _rel2: wrap180(norm360(_absYawDeg + 90) - droneHeading)
 
                 property real mountYawOffsetDeg: 0
 
-                readonly property real absYawDegNow: {
-                    if (!object) return NaN
-                    let v = hud._val(object.absoluteYaw)
-                    if (!Number.isFinite(v)) return NaN
-                    if (absYawIsRadians) v = v * 180 / Math.PI
-                    return norm360(v)
-                }
-
-                readonly property real headDegNow: Number.isFinite(bottomCompass.headingDeg)
-                                                ? norm360(bottomCompass.headingDeg) : NaN
-
                 readonly property real relAngleDeg: {
-                    if (!Number.isFinite(absYawDegNow) || !Number.isFinite(headDegNow)) return 0
-                    return wrap180(absYawDegNow + mountYawOffsetDeg - headDegNow)
+                    if (!_absYawValid || !Number.isFinite(droneHeading)) return 0
+                    return wrap180(norm360(_absYawDeg + mountYawOffsetDeg) - droneHeading)
                 }
 
-                // Repaint when relAngleDeg changes
-                onRelAngleDegChanged: gimbalCanvas.requestPaint()
+                // readonly property real relAngleDeg: (Math.abs(_rel1) <= Math.abs(_rel2)) ? _rel1 : _rel2
 
-                // Main drawing
+                on_AbsYawDegChanged: {
+                    if (_absYawValid) { _lastGoodAbsYaw = _absYawDeg; _haveLast = true }
+                }
+
+
+                visible: vehicle
+                        && QGroundControl.settingsManager.gimbalControllerSettings.showAzimuthIndicatorOnMap.rawValue
+
+                opacity: object === vehicle.gimbalController.activeGimbal ? 1.0 : 0.4
+
                 Canvas {
                     id: gimbalCanvas
                     anchors.fill: parent
@@ -948,7 +1050,8 @@ Item {
                         const cy = height / 2
                         const r  = bottomCompass.compassRadius - 1.5
 
-                        const aCenter = (gimbalItem.relAngleDeg) * Math.PI/180 - Math.PI/2
+                        let aCenter = (gimbalItem.relAngleDeg) * Math.PI / 180.0
+                        aCenter -= Math.PI / 2
 
                         const spanDeg = 10
                         const spanRad = spanDeg * Math.PI / 180.0
@@ -973,45 +1076,12 @@ Item {
                         ctx.lineTo(cx + Math.cos(a2) * r, cy + Math.sin(a2) * r)
                         ctx.stroke()
                     }
-
-                    // Recompute + repaint when inputs change
-                    Connections {
-                        target: bottomCompass
-                        ignoreUnknownSignals: true
-                        function onHeadingDegChanged() { gimbalCanvas.requestPaint() }
-                    }
-                    Connections {
-                        target: factOrNull(object ? object.absoluteYaw : null)
-                        ignoreUnknownSignals: true
-                        function onRawValueChanged() {
-                            if (gimbalItem._absYawValid) {
-                                gimbalItem._lastGoodAbsYaw = object.absoluteYaw.rawValue
-                                gimbalItem._haveLast = true
-                            }
-                            gimbalCanvas.requestPaint()
-                        }
-                    }
-                    Connections {
-                        target: gimbalItem
-                        ignoreUnknownSignals: true
-                        function onRelAngleDegChanged() { gimbalCanvas.requestPaint() }
-                    }
-
-                    onWidthChanged:  requestPaint()
-                    onHeightChanged: requestPaint()
-                    onVisibleChanged: if (visible) requestPaint()
                 }
 
-                // Initial compute
-                Component.onCompleted: { gimbalCanvas.requestPaint() }
-
-                // Visibility + opacity as before
-                visible: vehicle
-                    && QGroundControl.settingsManager.gimbalControllerSettings.showAzimuthIndicatorOnMap.rawValue
-                opacity: object === vehicle.gimbalController.activeGimbal ? 1.0 : 0.4
+                Connections { target: bottomCompass; function onHeadingDegChanged() { gimbalCanvas.requestPaint() } }
+                Connections { target: object && object.absoluteYaw ? object.absoluteYaw : null
+                            function onRawValueChanged() { gimbalCanvas.requestPaint() } }
             }
-
-
         }
     }
 
@@ -1025,8 +1095,18 @@ Item {
         anchors.right: parent.right
         anchors.bottom: parent.bottom
         anchors.rightMargin: hud.pad
-        anchors.bottomMargin: hud.pad * 3
-        width:  Math.max(220, hud.width * 0.22)
+        // anchors.bottomMargin: hud.pad * 3
+        anchors.bottomMargin: hud.bottomUiInset + 8
+        // anchors.bottomMargin: hud.effectiveBottomInset
+        property real shrinkExponent: 2.5
+
+        width: {
+            const maxW   = Math.max(220, hud.width * 0.22)
+            const pW     = parent ? parent.width : maxW
+            const ratio  = Math.min(1, pW / hud.width)
+            const eased  = Math.pow(ratio, shrinkExponent)
+            return Math.min(maxW * eased, pW)
+        }
         height: Math.max(90,  hud.height * 0.16)
 
         vehicle: hud.vehicle
@@ -1038,4 +1118,3 @@ Item {
     }
 
 }
-

@@ -15,7 +15,15 @@ import QGroundControl.Controls
 import QGroundControl.FlightDisplay
 
 RowLayout {
+    id: bottomRightRowLayout
+
+    property real bottomEdgeRightInset:  height + _layoutMargin
+    property real bottomEdgeCenterInset: bottomEdgeRightInset
+    property real rightEdgeBottomInset:  width + _layoutMargin
+    property real telemetryBarHeight: (telemetryBar.visible ? telemetryBar.height : 0)
+
     TelemetryValuesBar {
+        id: telemetryBar
         Layout.alignment:       Qt.AlignBottom
         extraWidth:             instrumentPanel.extraValuesWidth
         settingsGroup:          factValueGrid.telemetryBarSettingsGroup

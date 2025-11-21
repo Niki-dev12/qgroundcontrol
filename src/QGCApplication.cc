@@ -70,7 +70,6 @@
 #include "VehicleComponent.h"
 #include "VideoManager.h"
 
-#include "src/UI/mainwindow_prefs.h"
 #include <QtQml>
 
 #include "TerrainAheadSampler.h"
