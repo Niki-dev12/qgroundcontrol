@@ -154,15 +154,30 @@ Item {
         id: horizon
         anchors.fill: parent
 
-        // Bind to Facts
-        property real rollDeg:  (vehicle && vehicle.roll  && _finite(vehicle.roll.value))  ? vehicle.roll.value  : 0
-        property real pitchDeg: (vehicle && vehicle.pitch && _finite(vehicle.pitch.value)) ? vehicle.pitch.value : 0
+        // External input
+        property var vehicle
 
-        // Repaint on changes
-        onRollDegChanged:  attitudeCanvas.requestPaint()
-        onPitchDegChanged: attitudeCanvas.requestPaint()
-        onWidthChanged:    attitudeCanvas.requestPaint()
-        onHeightChanged:   attitudeCanvas.requestPaint()
+        // Style (reuse your HUD palette)
+        readonly property color cGreen: "#11C900"
+        readonly property color cText : "#000000"
+        readonly property real  thick : 5
+
+        // ---- Helpers (safe for Fact or number) ----
+        function _val(x) {
+            if (x === undefined || x === null) return NaN
+            if (typeof x === "number") return x
+            if (x && typeof x.value === "number") return x.value
+            if (x && typeof x.rawValue === "number") return x.rawValue
+            return NaN
+        }
+        function _finite(n) { return Number.isFinite(n) }
+
+        // Accessors
+        function roll()  { const r = _val(vehicle ? vehicle.roll  : NaN);  return _finite(r) ? r : 0 }
+        function pitch() { const p = _val(vehicle ? vehicle.pitch : NaN);  return _finite(p) ? p : 0 }
+        function alt()   { const a = _val(vehicle ? vehicle.altitudeRelative : NaN); return _finite(a) ? a : 0 }
+        function vs()    { const v = _val(vehicle ? vehicle.climbRate : NaN);        return _finite(v) ? v : 0 }
+        function gs()    { const g = _val(vehicle ? vehicle.groundSpeed : NaN);      return _finite(g) ? g : 0 }
 
         Canvas {
             id: attitudeCanvas
@@ -175,8 +190,13 @@ Item {
 
                 // --- constants / tuning ---
                 const horizonY        = height * 0.5
-                const ladderPxPerTick = 20
-                const ticksVisible    = 12
+
+                // vertical spacing & visible tick window scale with height
+                const rawLadderPxPerTick = height * 0.03
+                const maxLadderPxPerTick = 18
+                const ladderPxPerTick = Math.min(rawLadderPxPerTick, maxLadderPxPerTick)
+                const ticksVisible    = Math.floor(height / (ladderPxPerTick * 2.5))
+
                 // Altitude scale
                 const altTickStep     = 2.0
                 const altMajorEvery   = 10.0
@@ -194,7 +214,7 @@ Item {
                     const q = value / majorStep
                     return Math.abs(q - Math.round(q)) < 1e-6
                 }
-                // Map a tick value
+                // Map a tick value to Y
                 function yForTick(currentValue, tickValue, tickStep) {
                     const dticks = (tickValue - currentValue) / tickStep
                     return horizonY - dticks * ladderPxPerTick
@@ -204,6 +224,30 @@ Item {
                 const halfSpan = width * 0.25
                 const leftX    = width/2 - halfSpan
                 const rightX   = width/2 + halfSpan
+
+                const rawTickBaseLen = width * 0.04
+
+                const maxTickLen = 26
+
+                const tickBaseLen  = Math.min(rawTickBaseLen, maxTickLen)
+                const majorTickLen = tickBaseLen
+                const minorTickLen = tickBaseLen * 0.55
+
+                const rawTickBaseThickness = Math.max(1.5, height * 0.004)
+                const maxTickThickness     = 3.0
+
+                const tickBaseThickness = Math.min(rawTickBaseThickness, maxTickThickness)
+                const majorTickWidth    = tickBaseThickness * 1.8
+                const minorTickWidth    = tickBaseThickness
+
+                // // --- tick geometry (length + thickness scale with screen size) ---
+                // const tickBaseLen       = width * 0.04
+                // const majorTickLen      = tickBaseLen
+                // const minorTickLen      = tickBaseLen * 0.55
+
+                // const tickBaseThickness = Math.max(1.5, height * 0.004)
+                // const majorTickWidth    = tickBaseThickness * 1.8
+                // const minorTickWidth    = tickBaseThickness
 
                 // ---------------------------------------------
                 // 1) Horizon line (roll/pitch transform)
@@ -225,7 +269,7 @@ Item {
                 ctx.beginPath(); ctx.moveTo(gapHalf, 0);    ctx.lineTo(halfSpan2, 0); ctx.stroke()
 
                 // pitch text (left + right)
-                const pitchVal = Math.round(horizon.pitchDeg * 10) / 10
+                const pitchVal = Math.round(pitch() * 10) / 10
                 const txt = pitchVal + "°"
 
                 ctx.font = "14px sans-serif"
@@ -251,13 +295,13 @@ Item {
                 // ---------------------------------------------
                 // 2) RIGHT ladder: ALTITUDE  (major every 10 m)
                 //    LEFT  ladder: SPEED     (major every 1 m/s)
-                // Both use SAME ladderPxPerTick for symmetry.
+                //    Both use SAME ladderPxPerTick for symmetry.
                 // ---------------------------------------------
 
                 ctx.strokeStyle = cGreen
                 ctx.fillStyle   = cGreen
 
-                // ALTITUDE
+                // ALTITUDE (RIGHT)
                 {
                     const baseAlt = Math.floor(altNow / altTickStep) * altTickStep
 
@@ -267,19 +311,21 @@ Item {
                         if (y < -10 || y > height + 10) continue
 
                         const major = isMajor(tickVal, altMajorEvery)
-                        ctx.lineWidth = major ? 5 : 3.5
+
+                        // dynamic thickness + length
+                        ctx.lineWidth = major ? majorTickWidth : minorTickWidth
+                        const thisTickLen = major ? majorTickLen : minorTickLen
 
                         // RIGHT tick
                         ctx.beginPath()
                         ctx.moveTo(rightX, y)
-                        ctx.lineTo(rightX - (major ? 34 : 18), y)
+                        ctx.lineTo(rightX - thisTickLen, y)
                         ctx.stroke()
 
                         if (major) {
                             // ---- Major tick label ----
                             const padX = 6, padY = 2
-                            const rightTickLen = 34
-                            const gap = 6
+                            const gap  = 6
 
                             ctx.save()
                             ctx.font = "bold 13px sans-serif"
@@ -291,11 +337,10 @@ Item {
                             const rectW = tm.width + padX * 2
                             const rectH = 16 + padY * 2
 
-                            const tickEndX = rightX - rightTickLen
-                            const rectX = tickEndX - gap - rectW
-                            const rectY = y - rectH / 2
+                            const tickEndX = rightX - majorTickLen
+                            const rectX    = tickEndX - gap - rectW
+                            const rectY    = y - rectH / 2
 
-                            // text (cGreen)
                             ctx.fillStyle = cGreen
                             ctx.fillText(label, rectX + padX, y)
                             ctx.restore()
@@ -336,26 +381,30 @@ Item {
                     ctx.fillText(text, rectX + padX, horizonY)
                 }
 
-                // SPEED
+                // SPEED (LEFT)
                 {
                     const baseSpd = Math.floor(spdNow / spdTickStep) * spdTickStep
+
                     for (let j = -ticksVisible; j <= ticksVisible; j++) {
                         const tickVal = baseSpd + j * spdTickStep
                         const y = yForTick(spdNow, tickVal, spdTickStep)
                         if (y < -10 || y > height + 10) continue
 
                         const major = isMajor(tickVal, spdMajorEvery)
-                        ctx.lineWidth = major ? 5 : 3.5
+
+                        // dynamic thickness + length
+                        ctx.lineWidth = major ? majorTickWidth : minorTickWidth
+                        const thisTickLen = major ? majorTickLen : minorTickLen
 
                         // LEFT tick
                         ctx.beginPath()
                         ctx.moveTo(leftX, y)
-                        ctx.lineTo(leftX + (major ? 34 : 18), y)
+                        ctx.lineTo(leftX + thisTickLen, y)
                         ctx.stroke()
 
                         if (major) {
-                            const leftTickLen = (major ? 34 : 18)
-                            const gap = 6, padX5 = 6
+                            const gap  = 6
+                            const padX = 6
 
                             ctx.save()
                             ctx.font = "13px sans-serif"
@@ -363,54 +412,51 @@ Item {
 
                             const label = Math.round(tickVal).toString()
                             const ms = ctx.measureText(label)
-                            const rectW = ms.width + padX5*2
+                            const rectW = ms.width + padX * 2
 
-                            const tickEndX = leftX + leftTickLen
-                            const rectX = tickEndX + gap
-                            const rectY = y - 10
+                            const tickEndX = leftX + majorTickLen
+                            const rectX    = tickEndX + gap
+                            const rectY    = y - 10
 
                             ctx.textAlign = "left"
                             ctx.fillStyle = cGreen
-                            ctx.fillText(label, rectX + padX5, y)
+                            ctx.fillText(label, rectX + padX, y)
                             ctx.restore()
                         }
                     }
 
-                    // ---- LEFT fixed label ----
-                    {
-                        const gsNow = _finite(gs()) ? gs() : 0
-                        const text = `${gsNow.toFixed(1)} m/s`
+                    // ---- LEFT fixed label (GS) ----
+                    const gsNow = _finite(gs()) ? gs() : 0
+                    const text = `${gsNow.toFixed(1)} m/s`
 
-                        ctx.font = "bold 16px sans-serif"
-                        ctx.textAlign = "right"
-                        ctx.textBaseline = "middle"
+                    ctx.font = "bold 16px sans-serif"
+                    ctx.textAlign = "right"
+                    ctx.textBaseline = "middle"
 
-                        const padX = 6, padY = 3
-                        const m = ctx.measureText(text)
-                        const tw = m.width
-                        const th = 18
-                        const rectW = tw + padX * 2
-                        const rectH = th + padY * 4
-                        const rectX = leftX - rectW - 4
-                        const rectY = horizonY - th / 1.5 - padY
+                    const padX = 6, padY = 3
+                    const m2 = ctx.measureText(text)
+                    const tw = m2.width
+                    const th = 18
+                    const rectW = tw + padX * 2
+                    const rectH = th + padY * 4
+                    const rectX = leftX - rectW - 4
+                    const rectY = horizonY - th / 1.5 - padY
 
-                        ctx.save()
-                        ctx.globalCompositeOperation = "source-over"
-                        ctx.globalAlpha = 0.5
-                        ctx.fillStyle = "#000000"
-                        ctx.fillRect(rectX, rectY, rectW, rectH)
-                        ctx.restore()
+                    ctx.save()
+                    ctx.globalCompositeOperation = "source-over"
+                    ctx.globalAlpha = 0.5
+                    ctx.fillStyle = "#000000"
+                    ctx.fillRect(rectX, rectY, rectW, rectH)
+                    ctx.restore()
 
-                        // border
-                        ctx.lineWidth = 2
-                        ctx.strokeStyle = cGreen
-                        ctx.strokeRect(rectX + 0.5, rectY + 0.5, rectW - 1, rectH - 1)
+                    // border
+                    ctx.lineWidth = 2
+                    ctx.strokeStyle = cGreen
+                    ctx.strokeRect(rectX + 0.5, rectY + 0.5, rectW - 1, rectH - 1)
 
-                        // text
-                        ctx.fillStyle = cGreen
-                        ctx.fillText(text, rectX + rectW - padX, horizonY)
-                    }
-
+                    // text
+                    ctx.fillStyle = cGreen
+                    ctx.fillText(text, rectX + rectW - padX, horizonY)
                 }
 
                 // ---------------------------------------------
@@ -427,54 +473,78 @@ Item {
                 ctx.beginPath(); ctx.moveTo(cx, cy - armLen); ctx.lineTo(cx, cy - gapHalf2); ctx.stroke()
                 ctx.beginPath(); ctx.moveTo(cx, cy + gapHalf2); ctx.lineTo(cx, cy + armLen); ctx.stroke()
                 ctx.beginPath(); ctx.moveTo(cx - armLen, cy);   ctx.lineTo(cx - gapHalf2, cy); ctx.stroke()
-                ctx.beginPath(); ctx.moveTo(cx + gapHalf2, cy); ctx.lineTo(cx + armLen, cy);   ctx.stroke()
+                ctx.beginPath(); ctx.moveTo(cx + armLen, cy);   ctx.lineTo(cx + gapHalf2, cy); ctx.stroke()
             }
         }
 
+        // Repaint on geometry changes
+        onWidthChanged:  attitudeCanvas.requestPaint()
+        onHeightChanged: attitudeCanvas.requestPaint()
+
         // ROLL
-        Connections { target: factOrNull(vehicle ? vehicle.roll : null)
-            function onValueChanged() { attitudeCanvas.requestPaint() } }
-        Connections { target: vehicle; ignoreUnknownSignals: true
-            function onRollChanged() { attitudeCanvas.requestPaint() } }
+        Connections {
+            target: factOrNull(vehicle ? vehicle.roll : null)
+            function onValueChanged() { attitudeCanvas.requestPaint() }
+        }
+        Connections {
+            target: vehicle; ignoreUnknownSignals: true
+            function onRollChanged() { attitudeCanvas.requestPaint() }
+        }
 
         // PITCH
-        Connections { target: factOrNull(vehicle ? vehicle.pitch : null)
-            function onValueChanged() { attitudeCanvas.requestPaint() } }
-        Connections { target: vehicle; ignoreUnknownSignals: true
-            function onPitchChanged() { attitudeCanvas.requestPaint() } }
+        Connections {
+            target: factOrNull(vehicle ? vehicle.pitch : null)
+            function onValueChanged() { attitudeCanvas.requestPaint() }
+        }
+        Connections {
+            target: vehicle; ignoreUnknownSignals: true
+            function onPitchChanged() { attitudeCanvas.requestPaint() }
+        }
 
         // ALT REL
-        Connections { target: factOrNull(vehicle ? vehicle.altitudeRelative : null)
-            function onRawValueChanged() { attitudeCanvas.requestPaint() } }
-        Connections { target: vehicle; ignoreUnknownSignals: true
-            function onAltitudeRelativeChanged() { attitudeCanvas.requestPaint() } }
+        Connections {
+            target: factOrNull(vehicle ? vehicle.altitudeRelative : null)
+            function onRawValueChanged() { attitudeCanvas.requestPaint() }
+        }
+        Connections {
+            target: vehicle; ignoreUnknownSignals: true
+            function onAltitudeRelativeChanged() { attitudeCanvas.requestPaint() }
+        }
 
         // CLIMB/VSPD
-        Connections { target: factOrNull(vehicle ? vehicle.climbRate : null)
-            function onRawValueChanged() { attitudeCanvas.requestPaint() } }
-        Connections { target: vehicle; ignoreUnknownSignals: true
-            function onClimbRateChanged() { attitudeCanvas.requestPaint() } }
+        Connections {
+            target: factOrNull(vehicle ? vehicle.climbRate : null)
+            function onRawValueChanged() { attitudeCanvas.requestPaint() }
+        }
+        Connections {
+            target: vehicle; ignoreUnknownSignals: true
+            function onClimbRateChanged() { attitudeCanvas.requestPaint() }
+        }
 
         // GROUND SPEED
-        Connections { target: factOrNull(vehicle ? vehicle.groundSpeed : null)
-            function onRawValueChanged() { attitudeCanvas.requestPaint() } }
-        Connections { target: vehicle; ignoreUnknownSignals: true
-            function onGroundSpeedChanged() { attitudeCanvas.requestPaint() } }
-
+        Connections {
+            target: factOrNull(vehicle ? vehicle.groundSpeed : null)
+            function onRawValueChanged() { attitudeCanvas.requestPaint() }
+        }
+        Connections {
+            target: vehicle; ignoreUnknownSignals: true
+            function onGroundSpeedChanged() { attitudeCanvas.requestPaint() }
+        }
     }
 
     // ---------- Bottom-center compass using QGC vehicle heading ----------
     Item {
         id: bottomCompass
-        width: hud.width * 0.10
+        readonly property real minSizePx: ScreenTools.defaultFontPixelHeight * 6
+        readonly property real targetFrac: 0.10
+        width:  Math.max(minSizePx, hud.width * targetFrac)
         height: width
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.bottom: parent.bottom
         anchors.bottomMargin: hud.pad * 2
         visible: hud.hudCompassMode === 1
-
         property color compassColor: cGreen
-        readonly property real compassRadius: Math.min(width, height) * 0.40
+        readonly property real compassRadius: Math.min(width, height) * 0.40 // 0.40
 
         readonly property real launchHeadingDeg: {
             if (vehicle && vehicle.headingToHome && _finite(vehicle.headingToHome.rawValue)) {
