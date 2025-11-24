@@ -652,11 +652,18 @@ Item {
 
                 // fixed heading number
                 const headingStr = ("000" + Math.round(heading)).slice(-3)
-                ctx.font = "bold " + (outerR * 0.22) + "px sans-serif"
+
+                const headingFontSize = outerR * 0.22
+                ctx.font = "bold " + headingFontSize + "px sans-serif"
                 ctx.textAlign = "center"
                 ctx.textBaseline = "bottom"
                 ctx.fillStyle = "rgba(0,255,128,0.95)"
-                ctx.fillText(headingStr, cx, cy - outerR - 4)
+
+                const desiredY = cy - outerR - 4
+                const minBaselineY = headingFontSize + 4 // minimum baseline
+                const textY = Math.max(minBaselineY, desiredY)
+                ctx.fillText(headingStr, cx, textY)
+
             }
         }
 
