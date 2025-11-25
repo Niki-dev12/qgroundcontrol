@@ -593,6 +593,9 @@ void Vehicle::_mavlinkMessageReceived(LinkInterface* link, mavlink_message_t mes
     case MAVLINK_MSG_ID_FENCE_STATUS:
         _handleFenceStatus(message);
         break;
+    case MAVLINK_MSG_ID_COMMAND_LONG:
+        _handleCommandLong(message);
+        break;
 
     case MAVLINK_MSG_ID_EVENT:
     case MAVLINK_MSG_ID_CURRENT_EVENT_SEQUENCE:
@@ -654,9 +657,9 @@ void Vehicle::_mavlinkMessageReceived(LinkInterface* link, mavlink_message_t mes
     case MAVLINK_MSG_ID_CONTROL_STATUS:
         _handleControlStatus(message);
         break;   
-    case MAVLINK_MSG_ID_COMMAND_LONG:
-        _handleCommandLong(message);
-        break;
+    // case MAVLINK_MSG_ID_COMMAND_LONG:
+    //     _handleCommandLong(message);
+    //     break;
     }
 
     // This must be emitted after the vehicle processes the message. This way the vehicle state is up to date when anyone else
@@ -4134,14 +4137,39 @@ void Vehicle::_handleCommandRequestOperatorControl(const mavlink_command_long_t 
     emit requestOperatorControlReceived(commandLong.param1, commandLong.param3, commandLong.param4);
 }
 
+void Vehicle::_handleSpatialUser3(const mavlink_command_long_t& cmd)
+{
+    qDebug() << "User 3";
+
+    const double lat     = static_cast<double>(cmd.param5);
+    const double lon     = static_cast<double>(cmd.param6);
+    const double special = static_cast<double>(cmd.param7);
+
+    // write into the base VehicleFactGroup (same as heading)
+    specialLat()->setRawValue(lat);
+    specialLon()->setRawValue(lon);
+    specialData()->setRawValue(special);
+
+    qDebug() << "Lat:"     << lat;
+    qDebug() << "Lon:"     << lon;
+    qDebug() << "Special:" << special;
+}
+
 void Vehicle::_handleCommandLong(const mavlink_message_t& message)
 {
+    qDebug()<<"Command long";
     mavlink_command_long_t commandLong;
     mavlink_msg_command_long_decode(&message, &commandLong);
     // Ignore command if it is not targeted for us
     if (commandLong.target_system != MAVLinkProtocol::instance()->getSystemId()) {
         return;
     }
+    // Handle 31007
+    if (commandLong.command == MAV_CMD_SPATIAL_USER_3) {
+        _handleSpatialUser3(commandLong);
+        return;
+    }
+
     if (commandLong.command == MAV_CMD_REQUEST_OPERATOR_CONTROL) {
         _handleCommandRequestOperatorControl(commandLong);
     }

@@ -825,6 +825,7 @@ public slots:
     void _offlineVehicleTypeSettingChanged  (QVariant varVehicleType);  // Should only be used by MissionController to set vehicle type from Plan file
 
 signals:
+    void user3DataChanged               (double lat, double lon, double special);
     void coordinateChanged              (QGeoCoordinate coordinate);
     void joystickEnabledChanged         (bool enabled);
     void mavlinkMessageReceived         (const mavlink_message_t& message);
@@ -978,6 +979,7 @@ private:
 #endif
     void _handleCameraImageCaptured     (const mavlink_message_t& message);
     void _handleCommandLong             (const mavlink_message_t& message);
+    void _handleSpatialUser3            (const mavlink_command_long_t& cmd);
     void _missionManagerError           (int errorCode, const QString& errorMsg);
     void _geoFenceManagerError          (int errorCode, const QString& errorMsg);
     void _rallyPointManagerError        (int errorCode, const QString& errorMsg);

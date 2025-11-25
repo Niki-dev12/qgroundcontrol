@@ -47,6 +47,10 @@ VehicleFactGroup::VehicleFactGroup(QObject *parent)
     _addFact(&_throttlePctFact);
     _addFact(&_imuTempFact);
 
+    _addFact(&_specialLatFact);
+    _addFact(&_specialLonFact);
+    _addFact(&_specialDataFact);
+
     _hobbsFact.setRawValue(QStringLiteral("0000:00:00"));
 }
 
