@@ -266,7 +266,7 @@ Item {
         width:  _root.width
         height: _root.height
         z: 9999
-        visible: true //QGroundControl.videoManager.decoding && QGroundControl.videoManager.hudEnabled 
+        visible: QGroundControl.videoManager.decoding && QGroundControl.videoManager.hudEnabled 
 
         bottomUiInset:  videoControl.telemetryBottomInset
         videoMinimized: videoControl.videoMinimized

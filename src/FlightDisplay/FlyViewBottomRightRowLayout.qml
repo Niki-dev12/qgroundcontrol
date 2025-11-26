@@ -16,17 +16,13 @@ RowLayout {
         "qrc:/qml/QGroundControl/FlightMap/Widgets/AGLIndicator.qml"
     property var _instrumentFact: QGroundControl.settingsManager.flyViewSettings.instrumentQmlFile2
 
-    readonly property bool instrumentOnTop:
-        _instrumentFact && _instrumentFact.rawValue === _noCompassPath
-    property real telemetryBarHeight: instrumentOnTop
-                                      ? (telemetryBarVertical.visible   ? telemetryBarVertical.height   : 0)
-                                      : (telemetryBarHorizontal.visible ? telemetryBarHorizontal.height : 0)
+    readonly property bool instrumentOnTop: true
+        // _instrumentFact && _instrumentFact.rawValue === _noCompassPath
 
 
     ColumnLayout {
         id: verticalLayout
 
-        // This whole column is treated as one child in the RowLayout
         Layout.alignment: Qt.AlignRight | Qt.AlignBottom
         Layout.fillWidth: true
         visible:          bottomRightRowLayout.instrumentOnTop
@@ -34,7 +30,7 @@ RowLayout {
         FlyViewInstrumentPanel {
             id:                 instrumentPanelVertical
             Layout.alignment:   Qt.AlignRight | Qt.AlignBottom
-            Layout.fillWidth:   true
+            Layout.fillWidth:   false // true
 
             visible:            QGroundControl.corePlugin.options.flyView.showInstrumentPanel
                                 && _showSingleVehicleUI

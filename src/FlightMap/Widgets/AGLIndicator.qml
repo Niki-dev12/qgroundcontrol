@@ -21,6 +21,9 @@ Item {
     implicitWidth:  _totalRadius * 4
     implicitHeight: implicitWidth / 2
 
+    property real extraInset:       innerControl.extraInset
+    property real extraValuesWidth: innerControl.extraValuesWidth
+
     property real compassRadius:        ScreenTools.defaultFontPixelHeight * 6 / 2
     property real attitudeAngleDegrees: 0
 
@@ -39,11 +42,6 @@ Item {
     property var  vehicle:  QGroundControl.multiVehicleManager.activeVehicle
 
     on_AttitudeAnglePercentChanged: angleIndicator.requestPaint()
-
-    readonly property string _noCompassPath:
-        "qrc:/qml/QGroundControl/FlightMap/Widgets/AGLIndicator.qml"
-
-    property var _instrumentFact: QGroundControl.settingsManager.flyViewSettings.instrumentQmlFile2
 
     // -----------------------------------------------------------
     //  TerrainAheadProfile component (local)
@@ -365,7 +363,7 @@ Item {
         warnAGLM:       20
         warnUnderAGLM:  10
 
-        visible: _instrumentFact.rawValue === _noCompassPath
+        visible: true
     }
 
     // Dummy
