@@ -15,84 +15,106 @@ import QGroundControl.Palette
 Rectangle {
     id: control
 
-    // --- Instrument sizing & contract ---
     implicitWidth:  ScreenTools.defaultFontPixelHeight * 12
-    implicitHeight: ScreenTools.defaultFontPixelHeight * 2
+    implicitHeight: ScreenTools.defaultFontPixelHeight * 2.8
     width:          implicitWidth
     height:         implicitHeight
 
-    // FlyViewInstrumentPanel expects these:
     property real extraInset:       0
     property real extraValuesWidth: implicitWidth
 
-    // Active vehicle
     property var vehicle: QGroundControl.multiVehicleManager.activeVehicle
 
-    // Local palette used for colors
     QGCPalette { id: qgcPal; colorGroupEnabled: true }
 
     color:       qgcPal.window
     border.color:qgcPal.text
     radius:      ScreenTools.defaultFontPixelHeight * 0.5
 
-    // ---- Helper ----
     function fmt(value, digits) {
         return (value === undefined || value === null || isNaN(value))
                 ? "--"
                 : Number(value).toFixed(digits)
     }
 
-    Row {
+    Column {
         anchors.fill: parent
         anchors.margins: ScreenTools.defaultFontPixelWidth
-        spacing: ScreenTools.defaultFontPixelWidth
+        spacing: ScreenTools.defaultFontPixelHeight * 0.2
 
-        // LAT
-        QGCLabel {
-            width: parent.width / 3
-            horizontalAlignment: Text.AlignHCenter
-            verticalAlignment:   Text.AlignVCenter
-            text: fmt(
-                control.vehicle && control.vehicle.specialLat
-                    ? control.vehicle.specialLat.rawValue
-                    : NaN,
-                4
-            )
+        // -------------------------
+        // ROW 1: STATIC LABEL HEADERS
+        // -------------------------
+        
+        Row {
+            width: parent.width
+            spacing: ScreenTools.defaultFontPixelWidth
+
+            QGCLabel {
+                width: parent.width / 3
+                horizontalAlignment: Text.AlignHCenter
+                text: "Lat"
+            }
+
+            QGCLabel {
+                width: parent.width / 3
+                horizontalAlignment: Text.AlignHCenter
+                text: "Lon"
+            }
+
+            QGCLabel {
+                width: parent.width / 3
+                horizontalAlignment: Text.AlignHCenter
+                text: "Dist"
+            }
         }
 
-        // LON
-        QGCLabel {
-            width: parent.width / 3
-            horizontalAlignment: Text.AlignHCenter
-            verticalAlignment:   Text.AlignVCenter
-            text: fmt(
-                control.vehicle && control.vehicle.specialLon
-                    ? control.vehicle.specialLon.rawValue
-                    : NaN,
-                4
-            )
-        }
+        // -------------------------
+        // ROW 2: EXISTING VALUES
+        // -------------------------
+        Row {
+            width: parent.width
+            spacing: ScreenTools.defaultFontPixelWidth
 
-        // SPECIAL
-        QGCLabel {
-            width: parent.width / 3
-            horizontalAlignment: Text.AlignHCenter
-            verticalAlignment:   Text.AlignVCenter
-            text: fmt(
-                control.vehicle && control.vehicle.specialData
-                    ? control.vehicle.specialData.rawValue
-                    : NaN,
-                1
-            )
+            // LAT VALUE
+            QGCLabel {
+                width: parent.width / 3
+                horizontalAlignment: Text.AlignHCenter
+                verticalAlignment:   Text.AlignVCenter
+                text: fmt(
+                    control.vehicle && control.vehicle.specialLat
+                        ? control.vehicle.specialLat.rawValue
+                        : NaN,
+                    4
+                )
+            }
+
+            // LON VALUE
+            QGCLabel {
+                width: parent.width / 3
+                horizontalAlignment: Text.AlignHCenter
+                verticalAlignment:   Text.AlignVCenter
+                text: fmt(
+                    control.vehicle && control.vehicle.specialLon
+                        ? control.vehicle.specialLon.rawValue
+                        : NaN,
+                    4
+                )
+            }
+
+            // DIST VALUE (was specialData)
+            QGCLabel {
+                width: parent.width / 3
+                horizontalAlignment: Text.AlignHCenter
+                verticalAlignment:   Text.AlignVCenter
+                text: fmt(
+                    control.vehicle && control.vehicle.specialData
+                        ? control.vehicle.specialData.rawValue
+                        : NaN,
+                    1
+                )
+            }
         }
     }
 
-    Component.onCompleted: {
-        console.log("[SpatialUser3Instrument] vehicle =", control.vehicle)
-        if (control.vehicle) {
-            console.log("[SpatialUser3Instrument] specialLat  =", control.vehicle.specialLat)
-            console.log("[SpatialUser3Instrument] specialLon  =", control.vehicle.specialLon)
-            console.log("[SpatialUser3Instrument] specialData =", control.vehicle.specialData)
-        }
-    }
 }
