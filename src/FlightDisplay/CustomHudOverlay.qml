@@ -191,11 +191,13 @@ Item {
                 // --- constants / tuning ---
                 const horizonY        = height * 0.5
 
-                // vertical spacing & visible tick window scale with height
-                const rawLadderPxPerTick = height * 0.03
-                const maxLadderPxPerTick = 18
-                const ladderPxPerTick = Math.min(rawLadderPxPerTick, maxLadderPxPerTick)
-                const ticksVisible    = Math.floor(height / (ladderPxPerTick * 2.5))
+                const ladderCenterY = horizonY
+                const ladderHeight  = Math.min(height * 0.55, 260)
+                const ladderTop     = ladderCenterY - ladderHeight / 2
+                const ladderBottom  = ladderCenterY + ladderHeight / 2
+
+                const ladderPxPerTick = 14
+                const ticksVisible    = Math.floor(ladderHeight / (ladderPxPerTick * 2.0))
 
                 // Altitude scale
                 const altTickStep     = 2.0
@@ -217,7 +219,7 @@ Item {
                 // Map a tick value to Y
                 function yForTick(currentValue, tickValue, tickStep) {
                     const dticks = (tickValue - currentValue) / tickStep
-                    return horizonY - dticks * ladderPxPerTick
+                    return ladderCenterY - dticks * ladderPxPerTick
                 }
 
                 // --- geometry shared by labels/ticks ---
@@ -228,26 +230,18 @@ Item {
                 const rawTickBaseLen = width * 0.04
 
                 const maxTickLen = 26
-
                 const tickBaseLen  = Math.min(rawTickBaseLen, maxTickLen)
                 const majorTickLen = tickBaseLen
                 const minorTickLen = tickBaseLen * 0.55
 
                 const rawTickBaseThickness = Math.max(1.5, height * 0.004)
                 const maxTickThickness     = 3.0
-
                 const tickBaseThickness = Math.min(rawTickBaseThickness, maxTickThickness)
                 const majorTickWidth    = tickBaseThickness * 1.8
                 const minorTickWidth    = tickBaseThickness
 
-                // // --- tick geometry (length + thickness scale with screen size) ---
-                // const tickBaseLen       = width * 0.04
-                // const majorTickLen      = tickBaseLen
-                // const minorTickLen      = tickBaseLen * 0.55
-
-                // const tickBaseThickness = Math.max(1.5, height * 0.004)
-                // const majorTickWidth    = tickBaseThickness * 1.8
-                // const minorTickWidth    = tickBaseThickness
+                const tapeLineWidth = 2.0
+                const endTickLen = majorTickLen * 1.6
 
                 // ---------------------------------------------
                 // 1) Horizon line (roll/pitch transform)
@@ -278,17 +272,28 @@ Item {
                 const leftCenterX  = (-halfSpan2 + -gapHalf) / 2
                 const rightCenterX = (gapHalf + halfSpan2) / 2
                 const m = ctx.measureText(txt)
-                const textW = m.width, textH = 16, padX = 4, padY = 2
+                const textW = m.width
+                const textH = 16
+                const padX  = 4
+                const padY  = 2
 
-                ctx.save(); ctx.fillStyle = "rgba(18,201,0,0.5)"
-                ctx.fillRect(leftCenterX - textW/2 - padX, 16 - textH/2 - padY, textW + padX*2, textH + padY*2)
+                ctx.save()
+                ctx.fillStyle = "rgba(18,201,0,0.5)"
+                ctx.fillRect(leftCenterX - textW / 2 - padX, 16 - textH / 2 - padY,
+                            textW + padX * 2, textH + padY * 2)
                 ctx.restore()
-                ctx.fillStyle = cText; ctx.textAlign = "center"; ctx.fillText(txt, leftCenterX, 16)
+                ctx.fillStyle = cText
+                ctx.textAlign = "center"
+                ctx.fillText(txt, leftCenterX, 16)
 
-                ctx.save(); ctx.fillStyle = "rgba(18,201,0,0.5)"
-                ctx.fillRect(rightCenterX - textW/2 - padX, 16 - textH/2 - padY, textW + padX*2, textH + padY*2)
+                ctx.save()
+                ctx.fillStyle = "rgba(18,201,0,0.5)"
+                ctx.fillRect(rightCenterX - textW / 2 - padX, 16 - textH / 2 - padY,
+                            textW + padX * 2, textH + padY * 2)
                 ctx.restore()
-                ctx.fillStyle = cText; ctx.textAlign = "center"; ctx.fillText(txt, rightCenterX, 16)
+                ctx.fillStyle = cText
+                ctx.textAlign = "center"
+                ctx.fillText(txt, rightCenterX, 16)
 
                 ctx.restore()
 
@@ -305,158 +310,225 @@ Item {
                 {
                     const baseAlt = Math.floor(altNow / altTickStep) * altTickStep
 
+                    const altLineX = rightX - tickBaseLen - 6
+
+                    ctx.save()
+                    ctx.strokeStyle = "rgba(17,201,0,0.7)"
+                    ctx.lineWidth   = tapeLineWidth
+                    ctx.beginPath()
+                    ctx.moveTo(altLineX, ladderTop)
+                    ctx.lineTo(altLineX, ladderBottom)
+                    ctx.stroke()
+                    ctx.restore()
+
+                    ctx.save()
+                    ctx.strokeStyle = cGreen
+                    ctx.lineWidth   = tapeLineWidth
+
+                    ctx.beginPath()
+                    ctx.moveTo(altLineX, ladderTop)
+                    ctx.lineTo(altLineX + endTickLen, ladderTop)
+                    ctx.stroke()
+
+                    ctx.beginPath()
+                    ctx.moveTo(altLineX, ladderBottom)
+                    ctx.lineTo(altLineX + endTickLen, ladderBottom)
+                    ctx.stroke()
+
+                    ctx.restore()
+                    const signAlt = vspd >= 0 ? "+" : "−"
+                    const altText = `${altNow.toFixed(0)} m  ${signAlt}${Math.abs(vspd).toFixed(1)} m/s`
+
+                    ctx.font         = "bold 14px sans-serif"
+                    ctx.textAlign    = "left"
+                    ctx.textBaseline = "middle"
+
+                    const padX3 = 6
+                    const padY3 = 3
+                    const mmAlt = ctx.measureText(altText)
+                    const altTextWidth  = mmAlt.width
+                    const altTextHeight = 18
+                    const altRectW  = altTextWidth + padX3 * 2
+                    const altRectH  = altTextHeight + padY3 * 4
+
+                    const altRectX  = altLineX + 12
+                    const altRectY  = ladderCenterY - altRectH / 2
+
+                    const altLabelTop    = altRectY
+                    const altLabelBottom = altRectY + altRectH
+
                     for (let i = -ticksVisible; i <= ticksVisible; i++) {
                         const tickVal = baseAlt + i * altTickStep
                         const y = yForTick(altNow, tickVal, altTickStep)
-                        if (y < -10 || y > height + 10) continue
+
+                        if (y < ladderTop || y > ladderBottom) continue
 
                         const major = isMajor(tickVal, altMajorEvery)
-
-                        // dynamic thickness + length
                         ctx.lineWidth = major ? majorTickWidth : minorTickWidth
                         const thisTickLen = major ? majorTickLen : minorTickLen
 
-                        // RIGHT tick
+                        const inLabelBand = (y >= altLabelTop && y <= altLabelBottom)
+
+                        let tickStartX, tickEndX
+
+                        if (inLabelBand) {
+                            tickStartX = altLineX
+                            tickEndX   = altRectX
+                        } else {
+                            tickStartX = altLineX
+                            tickEndX   = altLineX + thisTickLen
+                        }
+
                         ctx.beginPath()
-                        ctx.moveTo(rightX, y)
-                        ctx.lineTo(rightX - thisTickLen, y)
+                        ctx.moveTo(tickStartX, y)
+                        ctx.lineTo(tickEndX,   y)
                         ctx.stroke()
 
-                        if (major) {
-                            // ---- Major tick label ----
-                            const padX = 6, padY = 2
-                            const gap  = 6
+                        if (major && !inLabelBand) {
+                            const label = Math.round(tickVal).toString()
+                            const gap   = 6
+                            const padLbl = 6
 
                             ctx.save()
-                            ctx.font = "bold 13px sans-serif"
+                            ctx.font         = "13px sans-serif"
                             ctx.textBaseline = "middle"
-                            ctx.textAlign = "left"
+                            ctx.textAlign    = "left"
+                            ctx.fillStyle    = cGreen
 
-                            const label = Math.round(tickVal).toString()
-                            const tm = ctx.measureText(label)
-                            const rectW = tm.width + padX * 2
-                            const rectH = 16 + padY * 2
-
-                            const tickEndX = rightX - majorTickLen
-                            const rectX    = tickEndX - gap - rectW
-                            const rectY    = y - rectH / 2
-
-                            ctx.fillStyle = cGreen
-                            ctx.fillText(label, rectX + padX, y)
+                            const labelX = tickEndX + gap
+                            ctx.fillText(label, labelX + padLbl - padLbl, y)
                             ctx.restore()
                         }
                     }
-
-                    // ---- Fixed label: ALT + VSPD ----
-                    const sign = vspd >= 0 ? "+" : "−"
-                    const text = `${altNow.toFixed(0)} m  ${sign}${Math.abs(vspd).toFixed(1)} m/s`
-
-                    ctx.font = "bold 14px sans-serif"
-                    ctx.textAlign = "left"
-                    ctx.textBaseline = "middle"
-
-                    const padX = 6, padY = 3
-                    const mm = ctx.measureText(text)
-                    const textWidth = mm.width
-                    const textHeight = 18
-                    const rectW = textWidth + padX * 2
-                    const rectH = textHeight + padY * 4
-                    const rectX = rightX + 4
-                    const rectY = horizonY - rectH / 2
 
                     // background
                     ctx.save()
                     ctx.globalAlpha = 0.5
                     ctx.fillStyle = "#000000"
-                    ctx.fillRect(rectX, rectY, rectW, rectH)
+                    ctx.fillRect(altRectX, altRectY, altRectW, altRectH)
                     ctx.restore()
 
                     // border
                     ctx.lineWidth = 2
                     ctx.strokeStyle = cGreen
-                    ctx.strokeRect(rectX + 0.5, rectY + 0.5, rectW - 1, rectH - 1)
+                    ctx.strokeRect(altRectX + 0.5, altRectY + 0.5, altRectW - 1, altRectH - 1)
 
                     // text
                     ctx.fillStyle = cGreen
-                    ctx.fillText(text, rectX + padX, horizonY)
+                    ctx.fillText(altText, altRectX + padX3, ladderCenterY)
                 }
 
                 // SPEED (LEFT)
                 {
                     const baseSpd = Math.floor(spdNow / spdTickStep) * spdTickStep
 
+                    const speedLineX = leftX + tickBaseLen + 6
+
+                    ctx.save()
+                    ctx.strokeStyle = "rgba(17,201,0,0.7)"
+                    ctx.lineWidth   = tapeLineWidth
+                    ctx.beginPath()
+                    ctx.moveTo(speedLineX, ladderTop)
+                    ctx.lineTo(speedLineX, ladderBottom)
+                    ctx.stroke()
+                    ctx.restore()
+
+                    ctx.save()
+                    ctx.strokeStyle = cGreen
+                    ctx.lineWidth   = tapeLineWidth
+
+                    ctx.beginPath()
+                    ctx.moveTo(speedLineX - endTickLen, ladderTop)
+                    ctx.lineTo(speedLineX,             ladderTop)
+                    ctx.stroke()
+
+                    ctx.beginPath()
+                    ctx.moveTo(speedLineX - endTickLen, ladderBottom)
+                    ctx.lineTo(speedLineX,              ladderBottom)
+                    ctx.stroke()
+
+                    ctx.restore()
+
+                    // ---- LEFT fixed label (GS) ----
+                    const gsNow = _finite(gs()) ? gs() : 0
+                    const spdText = `${gsNow.toFixed(1)} m/s`
+
+                    ctx.font         = "bold 16px sans-serif"
+                    ctx.textAlign    = "right"
+                    ctx.textBaseline = "middle"
+
+                    const padX = 6, padY = 3
+                    const m2   = ctx.measureText(spdText)
+                    const tw   = m2.width
+                    const th   = 18
+                    const spdRectW = tw + padX * 2
+                    const spdRectH = th + padY * 4
+
+                    // Box to the LEFT of the vertical line
+                    const spdRectX = speedLineX - spdRectW - 12
+                    const spdRectY = ladderCenterY - spdRectH / 2
+
+                    const spdLabelTop    = spdRectY
+                    const spdLabelBottom = spdRectY + spdRectH
+
+                    // --- SPEED ticks (full ladder) ---
                     for (let j = -ticksVisible; j <= ticksVisible; j++) {
                         const tickVal = baseSpd + j * spdTickStep
                         const y = yForTick(spdNow, tickVal, spdTickStep)
-                        if (y < -10 || y > height + 10) continue
+
+                        // Clamp to ladder window
+                        if (y < ladderTop || y > ladderBottom) continue
 
                         const major = isMajor(tickVal, spdMajorEvery)
-
-                        // dynamic thickness + length
                         ctx.lineWidth = major ? majorTickWidth : minorTickWidth
                         const thisTickLen = major ? majorTickLen : minorTickLen
 
-                        // LEFT tick
+                        const inLabelBand = (y >= spdLabelTop && y <= spdLabelBottom)
+
+                        let tickStartX, tickEndX
+
+                        if (inLabelBand) {
+                            tickStartX = spdRectX + spdRectW
+                            tickEndX   = speedLineX
+                        } else {
+                            tickStartX = speedLineX - thisTickLen
+                            tickEndX   = speedLineX
+                        }
+
                         ctx.beginPath()
-                        ctx.moveTo(leftX, y)
-                        ctx.lineTo(leftX + thisTickLen, y)
+                        ctx.moveTo(tickStartX, y)
+                        ctx.lineTo(tickEndX,   y)
                         ctx.stroke()
 
-                        if (major) {
-                            const gap  = 6
-                            const padX = 6
+                        if (major && !inLabelBand) {
+                            const label = Math.round(tickVal).toString()
+                            const gap   = 6
+                            const padLbl = 6
 
                             ctx.save()
-                            ctx.font = "13px sans-serif"
+                            ctx.font         = "13px sans-serif"
                             ctx.textBaseline = "middle"
+                            ctx.textAlign    = "right"
+                            ctx.fillStyle    = cGreen
 
-                            const label = Math.round(tickVal).toString()
-                            const ms = ctx.measureText(label)
-                            const rectW = ms.width + padX * 2
-
-                            const tickEndX = leftX + majorTickLen
-                            const rectX    = tickEndX + gap
-                            const rectY    = y - 10
-
-                            ctx.textAlign = "left"
-                            ctx.fillStyle = cGreen
-                            ctx.fillText(label, rectX + padX, y)
+                            const labelX = tickStartX - gap
+                            ctx.fillText(label, labelX - padLbl + padLbl, y)
                             ctx.restore()
                         }
                     }
 
-                    // ---- LEFT fixed label (GS) ----
-                    const gsNow = _finite(gs()) ? gs() : 0
-                    const text = `${gsNow.toFixed(1)} m/s`
-
-                    ctx.font = "bold 16px sans-serif"
-                    ctx.textAlign = "right"
-                    ctx.textBaseline = "middle"
-
-                    const padX = 6, padY = 3
-                    const m2 = ctx.measureText(text)
-                    const tw = m2.width
-                    const th = 18
-                    const rectW = tw + padX * 2
-                    const rectH = th + padY * 4
-                    const rectX = leftX - rectW - 4
-                    const rectY = horizonY - th / 1.5 - padY
-
                     ctx.save()
-                    ctx.globalCompositeOperation = "source-over"
                     ctx.globalAlpha = 0.5
-                    ctx.fillStyle = "#000000"
-                    ctx.fillRect(rectX, rectY, rectW, rectH)
+                    ctx.fillStyle   = "#000000"
+                    ctx.fillRect(spdRectX, spdRectY, spdRectW, spdRectH)
                     ctx.restore()
 
-                    // border
-                    ctx.lineWidth = 2
+                    ctx.lineWidth   = 2
                     ctx.strokeStyle = cGreen
-                    ctx.strokeRect(rectX + 0.5, rectY + 0.5, rectW - 1, rectH - 1)
+                    ctx.strokeRect(spdRectX + 0.5, spdRectY + 0.5, spdRectW - 1, spdRectH - 1)
 
-                    // text
                     ctx.fillStyle = cGreen
-                    ctx.fillText(text, rectX + rectW - padX, horizonY)
+                    ctx.fillText(spdText, spdRectX + spdRectW - padX, ladderCenterY)
                 }
 
                 // ---------------------------------------------
@@ -487,7 +559,8 @@ Item {
             function onValueChanged() { attitudeCanvas.requestPaint() }
         }
         Connections {
-            target: vehicle; ignoreUnknownSignals: true
+            target: vehicle
+            ignoreUnknownSignals: true
             function onRollChanged() { attitudeCanvas.requestPaint() }
         }
 
@@ -497,7 +570,8 @@ Item {
             function onValueChanged() { attitudeCanvas.requestPaint() }
         }
         Connections {
-            target: vehicle; ignoreUnknownSignals: true
+            target: vehicle
+            ignoreUnknownSignals: true
             function onPitchChanged() { attitudeCanvas.requestPaint() }
         }
 
@@ -507,7 +581,8 @@ Item {
             function onRawValueChanged() { attitudeCanvas.requestPaint() }
         }
         Connections {
-            target: vehicle; ignoreUnknownSignals: true
+            target: vehicle
+            ignoreUnknownSignals: true
             function onAltitudeRelativeChanged() { attitudeCanvas.requestPaint() }
         }
 
@@ -517,7 +592,8 @@ Item {
             function onRawValueChanged() { attitudeCanvas.requestPaint() }
         }
         Connections {
-            target: vehicle; ignoreUnknownSignals: true
+            target: vehicle
+            ignoreUnknownSignals: true
             function onClimbRateChanged() { attitudeCanvas.requestPaint() }
         }
 
@@ -527,7 +603,8 @@ Item {
             function onRawValueChanged() { attitudeCanvas.requestPaint() }
         }
         Connections {
-            target: vehicle; ignoreUnknownSignals: true
+            target: vehicle
+            ignoreUnknownSignals: true
             function onGroundSpeedChanged() { attitudeCanvas.requestPaint() }
         }
     }
