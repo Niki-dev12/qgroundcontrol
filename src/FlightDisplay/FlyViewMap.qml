@@ -275,11 +275,17 @@ FlightMap {
     MapItemView {
         model: QGroundControl.multiVehicleManager.vehicles
         delegate: VehicleMapItem {
-            vehicle:        object
-            coordinate:     object.coordinate
-            map:            _root
-            size:           pipMode ? ScreenTools.defaultFontPixelHeight : ScreenTools.defaultFontPixelHeight * 3
-            z:              QGroundControl.zOrderVehicles
+            vehicle:    object
+            coordinate: object.coordinate
+            map:        _root
+            z:          QGroundControl.zOrderVehicles
+            size: {
+                const ref   = 800.0
+                const k     = Math.min(_root.width, _root.height) / ref
+                const scale = Math.max(0.8, Math.min(2.0, k))
+                const base  = ScreenTools.defaultFontPixelHeight * 3
+                return base * scale
+            }
         }
     }
     // Add distance sensor view
