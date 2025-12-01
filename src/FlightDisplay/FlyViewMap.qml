@@ -283,7 +283,7 @@ FlightMap {
                 const ref   = 800.0
                 const k     = Math.min(_root.width, _root.height) / ref
                 const scale = Math.max(0.8, Math.min(2.0, k))
-                const base  = ScreenTools.defaultFontPixelHeight * 3
+                const base  = ScreenTools.defaultFontPixelHeight * 2
                 return base * scale
             }
         }
