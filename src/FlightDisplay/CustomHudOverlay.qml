@@ -612,16 +612,47 @@ Item {
     // ---------- Bottom-center compass using QGC vehicle heading ----------
     Item {
         id: bottomCompass
-        readonly property real minSizePx: ScreenTools.defaultFontPixelHeight * 6
-        readonly property real targetFrac: 0.10
-        width:  Math.max(minSizePx, hud.width * targetFrac)
+        readonly property real minSizePx:   ScreenTools.defaultFontPixelHeight * 8
+        readonly property real targetFrac:  0.15
+
+        readonly property real screenWidth: Qt.application && Qt.application.screens.length > 0
+                                            ? Qt.application.screens[0].width
+                                            : width
+
+        // Special sizes
+        readonly property real bigSizePx:   ScreenTools.defaultFontPixelHeight * 18
+        readonly property real maxSizePx:   ScreenTools.defaultFontPixelHeight * 14
+        readonly property real halfEpsPx:   ScreenTools.defaultFontPixelHeight * 2
+
+        readonly property bool _inMainWin: Window.window && Window.window === mainWindow
+        readonly property bool _fillsMainWin: _inMainWin &&
+                                            Math.abs(hud.width - Window.window.width) <
+                                                ScreenTools.defaultFontPixelHeight
+        readonly property bool _useFancySizing: _fillsMainWin
+
+        width: {
+            const hw   = hud.width
+            const normalScaled = Math.max(minSizePx, hw * targetFrac)
+            if (!_useFancySizing) {
+                return normalScaled
+            }
+            const half = screenWidth / 2
+            if (hw < half - halfEpsPx) {
+                return normalScaled
+            } else if (Math.abs(hw - half) <= halfEpsPx) {
+                return bigSizePx
+            } else {
+                return maxSizePx
+            }
+        }
+
         height: width
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.bottom: parent.bottom
         anchors.bottomMargin: hud.pad * 2
         visible: hud.hudCompassMode === 1
         property color compassColor: cGreen
-        readonly property real compassRadius: Math.min(width, height) * 0.40 // 0.40
+        readonly property real compassRadius: Math.min(width, height) * 0.40
 
         readonly property real launchHeadingDeg: {
             if (vehicle && vehicle.headingToHome && _finite(vehicle.headingToHome.rawValue)) {
