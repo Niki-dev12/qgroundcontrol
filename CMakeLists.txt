@@ -39,6 +39,19 @@ endif()
 
 include(Git)
 
+# -------------------------------------------------------
+# Custom Stribog version: av2_1_1-<short git hash>
+# -------------------------------------------------------
+set(STRIBOG_BASE_VERSION "av2_1_1")
+if(DEFINED QGC_GIT_HASH AND NOT QGC_GIT_HASH STREQUAL "")
+    string(SUBSTRING "${QGC_GIT_HASH}" 0 7 STRIBOG_COMMIT_SHORT)
+else()
+    set(STRIBOG_COMMIT_SHORT "unknown")
+endif()
+set(STRIBOG_VERSION_STRING "${STRIBOG_BASE_VERSION}-${STRIBOG_COMMIT_SHORT}")
+message(STATUS "Stribog custom version: ${STRIBOG_VERSION_STRING}")
+set(QGC_APP_VERSION_STR "${STRIBOG_VERSION_STRING}")
+
 project(${QGC_APP_NAME}
     VERSION ${QGC_APP_VERSION}
     DESCRIPTION ${QGC_APP_DESCRIPTION}
