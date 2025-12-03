@@ -13,15 +13,110 @@ Item {
     property var camera
     property var pipState
 
-    property int hudCompassMode: 1
+    property int hudCompassmallode: 1
 
     required property real bottomUiInset
     property bool  videoMinimized: false
 
-    property real effectiveBottomInset: videoMinimized ? (hud.pad * 3) : (bottomUiInset + 8)
+    //---------------HUD CONSTANTS------------------
 
-    onEffectiveBottomInsetChanged:
-        console.log("[HUD] effectiveBottomInset ->", effectiveBottomInset)
+    // Bottom inset behaviour
+    readonly property real hudMinimizedBottomMultiplier: 3
+    readonly property real hudBottomInsetExtraPx:        8
+
+    // Heading tape
+    readonly property real hudHeadingTapeWidthFraction:    0.50
+    readonly property real hudHeadingTapeHeightFraction:   0.10
+    readonly property int  hudHeadingTapeModelCount:       9
+    readonly property real hudHeadingStepDeg:             45
+    readonly property real hudHeadingSpanDeg:            180
+    readonly property int  hudHeadingCenterIndex:         4
+    readonly property int  hudHeadingLabelRadiusPx:       4
+    readonly property int  hudHeadingLabelHeightPx:      32
+    readonly property int  hudHeadingLabelMinWidthPx:    36
+    readonly property int  hudHeadingTickTopMarginPx:   -18
+    readonly property int  hudHeadingTickWidthPx:         3
+    readonly property int  hudHeadingTickHeightPx:       10
+
+    // Horizon / ladders
+    readonly property real hudHorizonCenterYFraction:      0.50
+    readonly property real hudLadderHeightFraction:        0.55
+    readonly property real hudLadderMaxHeightPx:          260
+    readonly property real hudLadderPixelsPerTick:         14
+    readonly property real hudLadderVisibleDivisor:        2.0
+
+    readonly property real hudAltTickStep:                 2.0
+    readonly property real hudAltMajorEvery:              10.0
+    readonly property real hudSpeedTickStep:               0.5
+    readonly property real hudSpeedMajorEvery:             1.0
+
+    readonly property real hudLadderHalfspanFraction:      0.25
+    readonly property real hudTickBaseLengthFraction:      0.04
+    readonly property real hudTickMaxLengthPx:            26
+    readonly property real hudMinorTickLengthFactor:       0.55
+
+    readonly property real hudTickBaseThicknessmallinPx:      1.5
+    readonly property real hudTickBaseThicknessHeightFactor: 0.004
+    readonly property real hudTickMaxThicknessPx:          3.0
+    readonly property real hudMajorTickWidthFactor:        1.8
+
+    readonly property real hudTapeLineWidthPx:             2.0
+    readonly property real hudEndTickLengthFactor:         1.6
+
+    readonly property real hudPitchTranslateFactor:        2.0
+    readonly property real hudHorizonInnerWidthFraction:   0.15
+    readonly property int  hudHorizonGapHalfPx:           40
+
+    readonly property int  hudPitchTextYPx:               16
+    readonly property int  hudPitchTextHeightPx:          16
+    readonly property int  hudPitchPadXPx:                 4
+    readonly property int  hudPitchPadYPx:                 2
+
+    readonly property int  hudAltLineOffsetPx:             6
+    readonly property int  hudAltLabelGapPx:              12
+    readonly property int  hudAltTextHeightPx:            18
+    readonly property int  hudAltPadXPx:                   6
+    readonly property int  hudAltPadYPx:                   3
+
+    readonly property real hudStrokePixelOffset:           0.5
+
+    //Speed ladder
+    readonly property int  hudSpeedTextHeightPx:          18
+    readonly property int  hudSpeedPadXPx:                 6
+    readonly property int  hudSpeedPadYPx:                 3
+    readonly property int  hudSpeedLabelGapPx:            12
+
+    // Crosshair
+    readonly property int  hudCrossGapPx:                 20
+    readonly property int  hudCrossArmExtraPx:            18
+
+    // Bottom compass sizing
+    readonly property real hudCompassTargetWidthFrac:      0.15
+    readonly property real hudCompassmallinSizeMult:          8
+    readonly property real hudCompassBigSizeMult:         18
+    readonly property real hudCompassmallaxSizeMult:         14
+    readonly property real hudCompassHalfEpsmallult:          2
+
+    readonly property real hudCompassRadiusFraction:       0.40
+    readonly property real hudCompassInnerRadiusFactor:    0.85
+    readonly property real hudCompassCardinalFontFrac:     0.20
+    readonly property int  hudCompassTickOuterOffsetPx:    2
+    readonly property int  hudCompassTickInnerOffsetPx:   10
+    readonly property int  hudCompassCardinalTextOffsetPx:16
+    readonly property int  hudCompassTickStepDeg:         30
+    readonly property int  hudCompassCardinalCount:        8
+
+    readonly property real hudHeadingFontSizeFrac:         0.22
+    readonly property int  hudHeadingBaselineOffsetPx:     4
+
+    // Launch indicator & gimbal
+    readonly property int  hudLaunchIndicatorSizePx:      22
+    readonly property real hudGimbalRadiusOffsetPx:       1.5
+    readonly property real hudGimbalSpanDeg:             10
+    readonly property real hudGimbalStrokeWidthPx:        1.5
+
+    // Tick
+    readonly property real hudMajorTickEps:               1e-6
 
     // ---- Style ----
     readonly property color cGreen: "#11C900"
@@ -30,68 +125,164 @@ Item {
     readonly property real  thick : 5
     readonly property real  pad   : Math.round(width * 0.01)
     readonly property real  big   : ScreenTools.largeFontPointSize
-    readonly property real  sm    : ScreenTools.smallFontPointSize
+    readonly property real  small    : ScreenTools.smallallFontPointSize
 
-    function _val(x) {
-        if (x === undefined || x === null) return NaN
-        if (typeof x === "number") return x
-        if (x && typeof x.value === "number") return x.value
-        if (x && typeof x.rawValue === "number") return x.rawValue
+    // Canvas-specific helper colors
+    readonly property string highlightFillColor: "rgba(17,201,0,0.5)"
+
+    // Compass / gimbal colors (Canvas strings)
+    readonly property string compassOuterFillColor:   "rgba(0,0,0,0.35)"
+    readonly property string compassOuterStrokeColor: "rgba(255,255,255,0.35)"
+    readonly property string compassInnerFillColor:   "rgba(0,0,0,0.20)"
+    readonly property string compassTickStrokeColor:  "rgba(255,255,255,0.4)"
+    readonly property string compassCardinalTextColor:"white"
+    readonly property string headingTextColor:        "rgba(0,255,128,0.95)"
+    readonly property string headingArrowFillColor:   "rgba(180,255,26,0.5)"
+    readonly property string gimbalFillActiveColor:   "rgba(255,140,0,0.25)"
+    readonly property string gimbalFillInactiveColor: "rgba(255,140,0,0.15)"
+    readonly property string gimbalStrokeColor:       "rgba(0,0,0,0.4)"
+
+    property real effectiveBottomInset: videoMinimized
+                                        ? (hud.pad * hudMinimizedBottomMultiplier)
+                                        : (bottomUiInset + hudBottomInsetExtraPx)
+
+    onEffectiveBottomInsetChanged:
+        console.log("[hud] effectiveBottomInset ->", effectiveBottomInset)
+
+    //helpers
+    function getNumericValue(source) {
+        if (source === undefined || source === null) {
+            return NaN
+        }
+        if (typeof source === "number") {
+            return source
+        }
+        if (source && typeof source.value === "number") {
+            return source.value
+        }
+        if (source && typeof source.rawValue === "number") {
+            return source.rawValue
+        }
         return NaN
     }
-    function _finite(n) { return Number.isFinite(n) }
 
-    function hdg() {
-        const h = _val(vehicle ? vehicle.heading : NaN)
-        return _finite(h) ? ((h % 360) + 360) % 360 : NaN
-    }
-    function pitch() {
-        const p = _val(vehicle ? vehicle.pitch : NaN)
-        return _finite(p) ? p : 0
-    }
-    function roll() {
-        const r = _val(vehicle ? vehicle.roll : NaN)
-        return _finite(r) ? r : 0
-    }
-    function vs() {
-        const v = _val(vehicle ? (vehicle.climbRate !== undefined ? vehicle.climbRate
-                                                                   : vehicle.verticalSpeed) : NaN)
-        return _finite(v) ? v : NaN
-    }
-    function gs() {
-        const v = _val(vehicle ? (vehicle.groundSpeed !== undefined ? vehicle.groundSpeed
-                                                                    : vehicle.horizontalSpeed) : NaN)
-        return _finite(v) ? v : NaN
-    }
-    function alt() {
-        const a = _val(vehicle ? vehicle.altitudeRelative : NaN)
-        return _finite(a) ? a : NaN
-    }
-    function volts() {
-        let v = (vehicle && vehicle.battery) ? _val(vehicle.battery.voltage) : NaN
-        if (!_finite(v)) v = _val(vehicle ? vehicle.batteryVoltage : NaN)
-        return _finite(v) ? v : NaN
+    function isFiniteNumber(value) {
+        return Number.isFinite(value)
     }
 
-    function factOrNull(f) {
-        return (f && typeof f === "object" && (f.value !== undefined || f.rawValue !== undefined)) ? f : null
+    //Angle helpers global
+    function normalizeAngle360(degrees) {
+        const numericAngle = getNumericValue(degrees)
+        if (!isFiniteNumber(numericAngle)) {
+            return NaN
+        }
+        let normalized = numericAngle % 360
+        if (normalized < 0) {
+            normalized += 360
+        }
+        return normalized
+    }
+
+    function normalizeAngle180(degrees) {
+        const numericAngle = getNumericValue(degrees)
+        if (!isFiniteNumber(numericAngle)) {
+            return NaN
+        }
+        return normalizeAngle360(numericAngle + 180) - 180
+    }
+
+    //Accessors
+    function getHeading() {
+        const headingValue = getNumericValue(vehicle ? vehicle.heading : NaN)
+        const normalized   = normalizeAngle360(headingValue)
+        return isFiniteNumber(normalized) ? normalized : NaN
+    }
+
+    function getPitch() {
+        const pitchValue = getNumericValue(vehicle ? vehicle.pitch : NaN)
+        return isFiniteNumber(pitchValue) ? pitchValue : NaN
+    }
+
+    function getRoll() {
+        const rollValue = getNumericValue(vehicle ? vehicle.roll : NaN)
+        return isFiniteNumber(rollValue) ? rollValue : NaN
+    }
+
+    function getRelativeAltitude() {
+        const altitudeValue = getNumericValue(vehicle ? vehicle.altitudeRelative : NaN)
+        return isFiniteNumber(altitudeValue) ? altitudeValue : NaN
+    }
+
+    function getVerticalSpeed() {
+        let verticalSpeedSource = NaN
+        if (vehicle) {
+            if (vehicle.climbRate !== undefined) {
+                verticalSpeedSource = vehicle.climbRate
+            } else if (vehicle.verticalSpeed !== undefined) {
+                verticalSpeedSource = vehicle.verticalSpeed
+            }
+        }
+        const verticalSpeedValue = getNumericValue(verticalSpeedSource)
+        return isFiniteNumber(verticalSpeedValue) ? verticalSpeedValue : NaN
+    }
+
+    function getGroundSpeed() {
+        let speedSource = NaN
+        if (vehicle) {
+            if (vehicle.groundSpeed !== undefined) {
+                speedSource = vehicle.groundSpeed
+            } else if (vehicle.horizontalSpeed !== undefined) {
+                speedSource = vehicle.horizontalSpeed
+            }
+        }
+        const speedValue = getNumericValue(speedSource)
+        return isFiniteNumber(speedValue) ? speedValue : NaN
+    }
+
+    function getBatteryVoltage() {
+        let voltageValue = NaN
+
+        if (vehicle && vehicle.battery) {
+            voltageValue = getNumericValue(vehicle.battery.voltage)
+        }
+
+        if (!isFiniteNumber(voltageValue)) {
+            voltageValue = getNumericValue(vehicle ? vehicle.batteryVoltage : NaN)
+        }
+
+        return isFiniteNumber(voltageValue) ? voltageValue : NaN
+    }
+
+    function factOrNull(factCandidate) {
+        return (factCandidate
+                && typeof factCandidate === "object"
+                && (factCandidate.value !== undefined || factCandidate.rawValue !== undefined))
+               ? factCandidate
+               : null
     }
 
     // ---------- Top heading tape ----------
     Item {
         id: headingTape
-        width: parent.width * 0.5
+        width: parent.width * hudHeadingTapeWidthFraction
         anchors.top: parent.top
         anchors.topMargin: pad
         anchors.horizontalCenter: parent.horizontalCenter
-        height: Math.round(parent.height * 0.10)
-        visible: hud.hudCompassMode === 0
+        height: Math.round(parent.height * hudHeadingTapeHeightFraction)
+        visible: hud.hudCompassmallode === 0
+
+        readonly property real headingStepDeg: hudHeadingStepDeg
+        readonly property real centerHeadingDeg: {
+            const headingValue = getHeading()
+            return isFiniteNumber(headingValue) ? headingValue : 0
+        }
 
         Rectangle { anchors.fill: parent; color: "transparent" }
 
         // Center caret
         Rectangle {
-            width: 14; height: 10
+            width: 14
+            height: 10
             color: "transparent"
             anchors.top: parent.top
             anchors.horizontalCenter: parent.horizontalCenter
@@ -101,29 +292,31 @@ Item {
 
         MouseArea {
             anchors.fill: parent
-            onClicked: hud.hudCompassMode = hud.hudCompassMode === 0 ? 1 : 0
+            onClicked: hud.hudCompassmallode = hud.hudCompassmallode === 0 ? 1 : 0
         }
 
         // Moving labels
         Repeater {
             id: hdgRep
-            model: 9
+            model: hudHeadingTapeModelCount
             delegate: Rectangle {
-                readonly property real stepDeg: 45
-                readonly property real center : _finite(hdg()) ? hdg() : 0
-                readonly property real deg    : Math.round(center/stepDeg)*stepDeg + (index-4)*stepDeg
-                readonly property real span   : 180.0
-                readonly property real xCenter: (deg - center)/span * headingTape.width + headingTape.width/2
+                readonly property real stepDeg:  headingTape.headingStepDeg
+                readonly property real center : headingTape.centerHeadingDeg
+                readonly property real degree : Math.round(center/stepDeg)*stepDeg
+                                                + (index-hudHeadingCenterIndex) * stepDeg
+                readonly property real span   : hudHeadingSpanDeg
+                readonly property real xCenter: (degree - center) / span * headingTape.width
+                                                + headingTape.width / 2
 
-                x: xCenter - width/2
+                x: xCenter - width / 2
                 anchors.verticalCenter: parent.verticalCenter
-                radius: 4
+                radius: hudHeadingLabelRadiusPx
                 color: cGreen
                 border.color: cGreen
                 border.width: 1
-                height: 32
-                width: Math.max(36, label.implicitWidth + 12)
-                visible: Math.abs(xCenter - headingTape.width/2) < headingTape.width/2 + width
+                height: hudHeadingLabelHeightPx
+                width: Math.max(hudHeadingLabelMinWidthPx, label.implicitWidth + 12)
+                visible: Math.abs(xCenter - headingTape.width / 2)< headingTape.width / 2 + width
 
                 QGCLabel {
                     id: label
@@ -132,17 +325,21 @@ Item {
                     font.bold: true
                     font.pointSize: big
                     text: {
-                        const idx = Math.round((deg / 45) % 8 + 8) % 8
-                        const comps = ["N","NE","E","SE","S","SW","W","NW"]
-                        return comps[idx]
+                        const indexInCompass = Math.round((degree / hudHeadingStepDeg)
+                                                          % hudCompassCardinalCount
+                                                          + hudCompassCardinalCount)
+                                                % hudCompassCardinalCount
+                        const labels = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
+                        return labels[indexInCompass]
                     }
                 }
 
                 Rectangle {
                     anchors.top: parent.top
                     anchors.horizontalCenter: parent.horizontalCenter
-                    anchors.topMargin: -18
-                    width: 3; height: 10
+                    anchors.topMargin: hudHeadingTickTopMarginPx
+                    width:  hudHeadingTickWidthPx
+                    height: hudHeadingTickHeightPx
                     color: cGreen
                 }
             }
@@ -154,148 +351,143 @@ Item {
         id: horizon
         anchors.fill: parent
 
-        // External input
-        property var vehicle
-
-        // Style (reuse your HUD palette)
-        readonly property color cGreen: "#11C900"
-        readonly property color cText : "#000000"
-        readonly property real  thick : 5
-
-        // ---- Helpers (safe for Fact or number) ----
-        function _val(x) {
-            if (x === undefined || x === null) return NaN
-            if (typeof x === "number") return x
-            if (x && typeof x.value === "number") return x.value
-            if (x && typeof x.rawValue === "number") return x.rawValue
-            return NaN
-        }
-        function _finite(n) { return Number.isFinite(n) }
-
-        // Accessors
-        function roll()  { const r = _val(vehicle ? vehicle.roll  : NaN);  return _finite(r) ? r : 0 }
-        function pitch() { const p = _val(vehicle ? vehicle.pitch : NaN);  return _finite(p) ? p : 0 }
-        function alt()   { const a = _val(vehicle ? vehicle.altitudeRelative : NaN); return _finite(a) ? a : 0 }
-        function vs()    { const v = _val(vehicle ? vehicle.climbRate : NaN);        return _finite(v) ? v : 0 }
-        function gs()    { const g = _val(vehicle ? vehicle.groundSpeed : NaN);      return _finite(g) ? g : 0 }
-
         Canvas {
             id: attitudeCanvas
             anchors.fill: parent
             antialiasing: true
 
             onPaint: {
-                const ctx = getContext("2d")
-                ctx.clearRect(0, 0, width, height)
+                const context = getContext("2d")
+                context.clearRect(0, 0, width, height)
 
                 // --- constants / tuning ---
-                const horizonY        = height * 0.5
+                const horizonY = height * hudHorizonCenterYFraction
 
                 const ladderCenterY = horizonY
-                const ladderHeight  = Math.min(height * 0.55, 260)
+                const ladderHeight  = Math.min(height * hudLadderHeightFraction,
+                                               hudLadderMaxHeightPx)
                 const ladderTop     = ladderCenterY - ladderHeight / 2
                 const ladderBottom  = ladderCenterY + ladderHeight / 2
 
-                const ladderPxPerTick = 14
-                const ticksVisible    = Math.floor(ladderHeight / (ladderPxPerTick * 2.0))
+                const ladderPixelsPerTick = hudLadderPixelsPerTick
+                const ticksVisible        = Math.floor(
+                                                ladderHeight /
+                                                (ladderPixelsPerTick * hudLadderVisibleDivisor))
 
                 // Altitude scale
-                const altTickStep     = 2.0
-                const altMajorEvery   = 10.0
+                const altitudeTickStep   = hudAltTickStep
+                const altitudeMajorEvery = hudAltMajorEvery
                 // Speed scale
-                const spdTickStep     = 0.5
-                const spdMajorEvery   = 1.0
+                const speedTickStep      = hudSpeedTickStep
+                const speedMajorEvery    = hudSpeedMajorEvery
 
                 // live values
-                const vspd   = _finite(vs())  ? vs()  : 0
-                const altNow = _finite(alt()) ? alt() : 0
-                const spdNow = _finite(gs())  ? gs()  : 0
+                const verticalSpeedValue    = getVerticalSpeed()
+                const verticalSpeedNow      = isFiniteNumber(verticalSpeedValue)
+                                              ? verticalSpeedValue : 0
+                const relativeAltitudeValue = getRelativeAltitude()
+                const relativeAltitudeNow   = isFiniteNumber(relativeAltitudeValue)
+                                              ? relativeAltitudeValue : 0
+                const groundSpeedValue      = getGroundSpeed()
+                const groundSpeedNow        = isFiniteNumber(groundSpeedValue)
+                                              ? groundSpeedValue : 0
 
                 // helpers
-                function isMajor(value, majorStep) {
-                    const q = value / majorStep
-                    return Math.abs(q - Math.round(q)) < 1e-6
+                function ismallajorTick(value, majorStep) {
+                    const ratio = value / majorStep
+                    return Math.abs(ratio - Math.round(ratio)) < hudMajorTickEps
                 }
                 // Map a tick value to Y
                 function yForTick(currentValue, tickValue, tickStep) {
-                    const dticks = (tickValue - currentValue) / tickStep
-                    return ladderCenterY - dticks * ladderPxPerTick
+                    const deltaTicks = (tickValue - currentValue) / tickStep
+                    return ladderCenterY - deltaTicks * ladderPixelsPerTick
                 }
 
                 // --- geometry shared by labels/ticks ---
-                const halfSpan = width * 0.25
-                const leftX    = width/2 - halfSpan
-                const rightX   = width/2 + halfSpan
+                const halfSpan = width * hudLadderHalfspanFraction
+                const leftX    = width / 2 - halfSpan
+                const rightX   = width / 2 + halfSpan
 
-                const rawTickBaseLen = width * 0.04
+                const rawTickBaseLength = width * hudTickBaseLengthFraction
+                const maxTickLength     = hudTickMaxLengthPx
+                const tickBaseLength    = Math.min(rawTickBaseLength, maxTickLength)
+                const majorTickLength   = tickBaseLength
+                const minorTickLength   = tickBaseLength * hudMinorTickLengthFactor
 
-                const maxTickLen = 26
-                const tickBaseLen  = Math.min(rawTickBaseLen, maxTickLen)
-                const majorTickLen = tickBaseLen
-                const minorTickLen = tickBaseLen * 0.55
+                const rawTickBaseThickness = Math.max(hudTickBaseThicknessmallinPx,
+                                                      height * hudTickBaseThicknessHeightFactor)
+                const maxTickThickness     = hudTickMaxThicknessPx
+                const tickBaseThickness    = Math.min(rawTickBaseThickness, maxTickThickness)
+                const majorTickWidth       = tickBaseThickness * hudMajorTickWidthFactor
+                const minorTickWidth       = tickBaseThickness
 
-                const rawTickBaseThickness = Math.max(1.5, height * 0.004)
-                const maxTickThickness     = 3.0
-                const tickBaseThickness = Math.min(rawTickBaseThickness, maxTickThickness)
-                const majorTickWidth    = tickBaseThickness * 1.8
-                const minorTickWidth    = tickBaseThickness
-
-                const tapeLineWidth = 2.0
-                const endTickLen = majorTickLen * 1.6
+                const tapeLineWidth  = hudTapeLineWidthPx
+                const endTickLength  = majorTickLength * hudEndTickLengthFactor
 
                 // ---------------------------------------------
                 // 1) Horizon line (roll/pitch transform)
                 // ---------------------------------------------
-                ctx.save()
-                ctx.translate(width/2, horizonY)
-                ctx.rotate(-roll() * Math.PI/180)
-                ctx.translate(0, pitch() * 2.0)
+                context.save()
+                context.translate(width / 2, horizonY)
+                context.rotate(-getRoll() * Math.PI / 180)
+                context.translate(0, getPitch() * hudPitchTranslateFactor)
 
-                ctx.strokeStyle = cGreen
-                ctx.lineWidth = thick
+                context.strokeStyle = cGreen
+                context.lineWidth = thick
 
-                const halfSpan2 = width * 0.15
-                const gapHalf   = 40
+                const halfSpanInner = width * hudHorizonInnerWidthFraction
+                const gapHalf       = hudHorizonGapHalfPx
 
                 // left segment
-                ctx.beginPath(); ctx.moveTo(-halfSpan2, 0); ctx.lineTo(-gapHalf, 0); ctx.stroke()
+                context.beginPath()
+                context.moveTo(-halfSpanInner, 0)
+                context.lineTo(-gapHalf, 0)
+                context.stroke()
                 // right segment
-                ctx.beginPath(); ctx.moveTo(gapHalf, 0);    ctx.lineTo(halfSpan2, 0); ctx.stroke()
+                context.beginPath()
+                context.moveTo(gapHalf, 0)
+                context.lineTo(halfSpanInner, 0)
+                context.stroke()
 
                 // pitch text (left + right)
-                const pitchVal = Math.round(pitch() * 10) / 10
-                const txt = pitchVal + "°"
+                const pitchRounded = Math.round(getPitch() * 10) / 10
+                const pitchText    = pitchRounded + "°"
 
-                ctx.font = "14px sans-serif"
-                ctx.textBaseline = "middle"
+                context.font = "14px sans-serif"
+                context.textBaseline = "middle"
 
-                const leftCenterX  = (-halfSpan2 + -gapHalf) / 2
-                const rightCenterX = (gapHalf + halfSpan2) / 2
-                const m = ctx.measureText(txt)
-                const textW = m.width
-                const textH = 16
-                const padX  = 4
-                const padY  = 2
+                const leftCenterX  = (-halfSpanInner + -gapHalf) / 2
+                const rightCenterX = (gapHalf + halfSpanInner) / 2
+                const pitchMetrics = context.measureText(pitchText)
+                const pitchTextWidth  = pitchMetrics.width
+                const pitchTextHeight = hudPitchTextHeightPx
+                const pitchPadX       = hudPitchPadXPx
+                const pitchPadY       = hudPitchPadYPx
 
-                ctx.save()
-                ctx.fillStyle = "rgba(18,201,0,0.5)"
-                ctx.fillRect(leftCenterX - textW / 2 - padX, 16 - textH / 2 - padY,
-                            textW + padX * 2, textH + padY * 2)
-                ctx.restore()
-                ctx.fillStyle = cText
-                ctx.textAlign = "center"
-                ctx.fillText(txt, leftCenterX, 16)
+                // background rectangles for pitch labels
+                context.save()
+                context.fillStyle = hud.highlightFillColor
+                context.fillRect(leftCenterX - pitchTextWidth / 2 - pitchPadX,
+                                 hudPitchTextYPx - pitchTextHeight / 2 - pitchPadY,
+                                 pitchTextWidth + pitchPadX * 2,
+                                 pitchTextHeight + pitchPadY * 2)
+                context.restore()
+                context.fillStyle = cText
+                context.textAlign = "center"
+                context.fillText(pitchText, leftCenterX, hudPitchTextYPx)
 
-                ctx.save()
-                ctx.fillStyle = "rgba(18,201,0,0.5)"
-                ctx.fillRect(rightCenterX - textW / 2 - padX, 16 - textH / 2 - padY,
-                            textW + padX * 2, textH + padY * 2)
-                ctx.restore()
-                ctx.fillStyle = cText
-                ctx.textAlign = "center"
-                ctx.fillText(txt, rightCenterX, 16)
+                context.save()
+                context.fillStyle = hud.highlightFillColor
+                context.fillRect(rightCenterX - pitchTextWidth / 2 - pitchPadX,
+                                 hudPitchTextYPx - pitchTextHeight / 2 - pitchPadY,
+                                 pitchTextWidth + pitchPadX * 2,
+                                 pitchTextHeight + pitchPadY * 2)
+                context.restore()
+                context.fillStyle = cText
+                context.textAlign = "center"
+                context.fillText(pitchText, rightCenterX, hudPitchTextYPx)
 
-                ctx.restore()
+                context.restore()
 
                 // ---------------------------------------------
                 // 2) RIGHT ladder: ALTITUDE  (major every 10 m)
@@ -303,249 +495,293 @@ Item {
                 //    Both use SAME ladderPxPerTick for symmetry.
                 // ---------------------------------------------
 
-                ctx.strokeStyle = cGreen
-                ctx.fillStyle   = cGreen
+                context.strokeStyle = cGreen
+                context.fillStyle   = cGreen
 
                 // ALTITUDE (RIGHT)
                 {
-                    const baseAlt = Math.floor(altNow / altTickStep) * altTickStep
+                    const baseAltitude = Math.floor(relativeAltitudeNow / altitudeTickStep)
+                                         * altitudeTickStep
 
-                    const altLineX = rightX - tickBaseLen - 6
+                    const altitudeLineX = rightX - tickBaseLength - hudAltLineOffsetPx
 
-                    ctx.save()
-                    ctx.strokeStyle = "rgba(17,201,0,0.7)"
-                    ctx.lineWidth   = tapeLineWidth
-                    ctx.beginPath()
-                    ctx.moveTo(altLineX, ladderTop)
-                    ctx.lineTo(altLineX, ladderBottom)
-                    ctx.stroke()
-                    ctx.restore()
 
-                    ctx.save()
-                    ctx.strokeStyle = cGreen
-                    ctx.lineWidth   = tapeLineWidth
+                    context.save()
+                    context.strokeStyle = hud.highlightFillColor
+                    context.lineWidth   = tapeLineWidth
+                    context.beginPath()
+                    context.moveTo(altitudeLineX, ladderTop)
+                    context.lineTo(altitudeLineX, ladderBottom)
+                    context.stroke()
+                    context.restore()
 
-                    ctx.beginPath()
-                    ctx.moveTo(altLineX, ladderTop)
-                    ctx.lineTo(altLineX + endTickLen, ladderTop)
-                    ctx.stroke()
+                    context.save()
+                    context.strokeStyle = cGreen
+                    context.lineWidth   = tapeLineWidth
 
-                    ctx.beginPath()
-                    ctx.moveTo(altLineX, ladderBottom)
-                    ctx.lineTo(altLineX + endTickLen, ladderBottom)
-                    ctx.stroke()
+                    context.beginPath()
+                    context.moveTo(altitudeLineX, ladderTop)
+                    context.lineTo(altitudeLineX + endTickLength, ladderTop)
+                    context.stroke()
 
-                    ctx.restore()
-                    const signAlt = vspd >= 0 ? "+" : "−"
-                    const altText = `${altNow.toFixed(0)} m  ${signAlt}${Math.abs(vspd).toFixed(1)} m/s`
+                    context.beginPath()
+                    context.moveTo(altitudeLineX, ladderBottom)
+                    context.lineTo(altitudeLineX + endTickLength, ladderBottom)
+                    context.stroke()
 
-                    ctx.font         = "bold 14px sans-serif"
-                    ctx.textAlign    = "left"
-                    ctx.textBaseline = "middle"
+                    context.restore()
 
-                    const padX3 = 6
-                    const padY3 = 3
-                    const mmAlt = ctx.measureText(altText)
-                    const altTextWidth  = mmAlt.width
-                    const altTextHeight = 18
-                    const altRectW  = altTextWidth + padX3 * 2
-                    const altRectH  = altTextHeight + padY3 * 4
+                    const altitudeSign  = verticalSpeedNow >= 0 ? "+" : "−"
+                    const altitudeText  = `${relativeAltitudeNow.toFixed(0)} m  `
+                                          + `${altitudeSign}${Math.abs(verticalSpeedNow).toFixed(1)} m/s`
 
-                    const altRectX  = altLineX + 12
-                    const altRectY  = ladderCenterY - altRectH / 2
+                    context.font         = "bold 14px sans-serif"
+                    context.textAlign    = "left"
+                    context.textBaseline = "middle"
 
-                    const altLabelTop    = altRectY
-                    const altLabelBottom = altRectY + altRectH
+                    const altitudePadX = hudAltPadXPx
+                    const altitudePadY = hudAltPadYPx
+                    const altitudeMetrics = context.measureText(altitudeText)
+                    const altitudeTextWidth  = altitudeMetrics.width
+                    const altitudeTextHeight = hudAltTextHeightPx
+                    const altitudeRectWidth  = altitudeTextWidth + altitudePadX * 2
+                    const altitudeRectHeight = altitudeTextHeight + altitudePadY * 4
+
+                    const altitudeLabelHorizontalGap = hudAltLabelGapPx
+                    const altitudeRectX  = altitudeLineX + altitudeLabelHorizontalGap
+                    const altitudeRectY  = ladderCenterY - altitudeRectHeight / 2
+
+                    const altitudeLabelTop    = altitudeRectY
+                    const altitudeLabelBottom = altitudeRectY + altitudeRectHeight
 
                     for (let i = -ticksVisible; i <= ticksVisible; i++) {
-                        const tickVal = baseAlt + i * altTickStep
-                        const y = yForTick(altNow, tickVal, altTickStep)
+                        const tickValue = baseAltitude + i * altitudeTickStep
+                        const tickY = yForTick(relativeAltitudeNow, tickValue, altitudeTickStep)
 
-                        if (y < ladderTop || y > ladderBottom) continue
-
-                        const major = isMajor(tickVal, altMajorEvery)
-                        ctx.lineWidth = major ? majorTickWidth : minorTickWidth
-                        const thisTickLen = major ? majorTickLen : minorTickLen
-
-                        const inLabelBand = (y >= altLabelTop && y <= altLabelBottom)
-
-                        let tickStartX, tickEndX
-
-                        if (inLabelBand) {
-                            tickStartX = altLineX
-                            tickEndX   = altRectX
-                        } else {
-                            tickStartX = altLineX
-                            tickEndX   = altLineX + thisTickLen
+                        if (tickY < ladderTop || tickY > ladderBottom) {
+                            continue
                         }
 
-                        ctx.beginPath()
-                        ctx.moveTo(tickStartX, y)
-                        ctx.lineTo(tickEndX,   y)
-                        ctx.stroke()
+                        const majorTick      = ismallajorTick(tickValue, altitudeMajorEvery)
+                        context.lineWidth    = majorTick ? majorTickWidth : minorTickWidth
+                        const thisTickLength = majorTick ? majorTickLength : minorTickLength
 
-                        if (major && !inLabelBand) {
-                            const label = Math.round(tickVal).toString()
-                            const gap   = 6
-                            const padLbl = 6
+                        const inLabelBand = (tickY >= altitudeLabelTop && tickY <= altitudeLabelBottom)
 
-                            ctx.save()
-                            ctx.font         = "13px sans-serif"
-                            ctx.textBaseline = "middle"
-                            ctx.textAlign    = "left"
-                            ctx.fillStyle    = cGreen
+                        let tickStartX
+                        let tickEndX
 
-                            const labelX = tickEndX + gap
-                            ctx.fillText(label, labelX + padLbl - padLbl, y)
-                            ctx.restore()
+                        if (inLabelBand) {
+                            tickStartX = altitudeLineX
+                            tickEndX   = altitudeRectX
+                        } else {
+                            tickStartX = altitudeLineX
+                            tickEndX   = altitudeLineX + thisTickLength
+                        }
+
+                        context.beginPath()
+                        context.moveTo(tickStartX, tickY)
+                        context.lineTo(tickEndX,   tickY)
+                        context.stroke()
+
+                        if (majorTick && !inLabelBand) {
+                            const labelText    = Math.round(tickValue).toString()
+                            const labelGapPx   = 6
+
+                            context.save()
+                            context.font         = "13px sans-serif"
+                            context.textBaseline = "middle"
+                            context.textAlign    = "left"
+                            context.fillStyle    = cGreen
+
+                            const labelX = tickEndX + labelGapPx
+                            context.fillText(labelText, labelX, tickY)
+                            context.restore()
                         }
                     }
 
                     // background
-                    ctx.save()
-                    ctx.globalAlpha = 0.5
-                    ctx.fillStyle = "#000000"
-                    ctx.fillRect(altRectX, altRectY, altRectW, altRectH)
-                    ctx.restore()
+                    context.save()
+                    context.globalAlpha = 0.5
+                    context.fillStyle   = cFill
+                    context.fillRect(altitudeRectX, altitudeRectY,
+                                     altitudeRectWidth, altitudeRectHeight)
+                    context.restore()
 
                     // border
-                    ctx.lineWidth = 2
-                    ctx.strokeStyle = cGreen
-                    ctx.strokeRect(altRectX + 0.5, altRectY + 0.5, altRectW - 1, altRectH - 1)
+                    const strokePixelOffset = hudStrokePixelOffset
+                    context.lineWidth   = 2
+                    context.strokeStyle = cGreen
+                    context.strokeRect(altitudeRectX + strokePixelOffset,
+                                       altitudeRectY + strokePixelOffset,
+                                       altitudeRectWidth  - 2 * strokePixelOffset,
+                                       altitudeRectHeight - 2 * strokePixelOffset)
 
                     // text
-                    ctx.fillStyle = cGreen
-                    ctx.fillText(altText, altRectX + padX3, ladderCenterY)
+                    context.fillStyle = cGreen
+                    context.fillText(altitudeText,
+                                     altitudeRectX + altitudePadX,
+                                     ladderCenterY)
                 }
 
                 // SPEED (LEFT)
                 {
-                    const baseSpd = Math.floor(spdNow / spdTickStep) * spdTickStep
+                    const baseSpeed = Math.floor(groundSpeedNow / speedTickStep)
+                                      * speedTickStep
 
-                    const speedLineX = leftX + tickBaseLen + 6
+                    const speedLineX = leftX + tickBaseLength + hudAltLineOffsetPx
 
-                    ctx.save()
-                    ctx.strokeStyle = "rgba(17,201,0,0.7)"
-                    ctx.lineWidth   = tapeLineWidth
-                    ctx.beginPath()
-                    ctx.moveTo(speedLineX, ladderTop)
-                    ctx.lineTo(speedLineX, ladderBottom)
-                    ctx.stroke()
-                    ctx.restore()
+                    context.save()
+                    context.strokeStyle = hud.highlightFillColor
+                    context.lineWidth   = tapeLineWidth
+                    context.beginPath()
+                    context.moveTo(speedLineX, ladderTop)
+                    context.lineTo(speedLineX, ladderBottom)
+                    context.stroke()
+                    context.restore()
 
-                    ctx.save()
-                    ctx.strokeStyle = cGreen
-                    ctx.lineWidth   = tapeLineWidth
+                    context.save()
+                    context.strokeStyle = cGreen
+                    context.lineWidth   = tapeLineWidth
 
-                    ctx.beginPath()
-                    ctx.moveTo(speedLineX - endTickLen, ladderTop)
-                    ctx.lineTo(speedLineX,             ladderTop)
-                    ctx.stroke()
+                    context.beginPath()
+                    context.moveTo(speedLineX - endTickLength, ladderTop)
+                    context.lineTo(speedLineX,                 ladderTop)
+                    context.stroke()
 
-                    ctx.beginPath()
-                    ctx.moveTo(speedLineX - endTickLen, ladderBottom)
-                    ctx.lineTo(speedLineX,              ladderBottom)
-                    ctx.stroke()
+                    context.beginPath()
+                    context.moveTo(speedLineX - endTickLength, ladderBottom)
+                    context.lineTo(speedLineX,                 ladderBottom)
+                    context.stroke()
 
-                    ctx.restore()
+                    context.restore()
 
                     // ---- LEFT fixed label (GS) ----
-                    const gsNow = _finite(gs()) ? gs() : 0
-                    const spdText = `${gsNow.toFixed(1)} m/s`
+                    const groundSpeedLabelValue = isFiniteNumber(groundSpeedNow)
+                                                  ? groundSpeedNow : 0
+                    const groundSpeedText       = `${groundSpeedLabelValue.toFixed(1)} m/s`
 
-                    ctx.font         = "bold 16px sans-serif"
-                    ctx.textAlign    = "right"
-                    ctx.textBaseline = "middle"
+                    context.font         = "bold 16px sans-serif"
+                    context.textAlign    = "right"
+                    context.textBaseline = "middle"
 
-                    const padX = 6, padY = 3
-                    const m2   = ctx.measureText(spdText)
-                    const tw   = m2.width
-                    const th   = 18
-                    const spdRectW = tw + padX * 2
-                    const spdRectH = th + padY * 4
+                    const groundSpeedPadX = hudSpeedPadXPx
+                    const groundSpeedPadY = hudSpeedPadYPx
+                    const groundSpeedMetrics = context.measureText(groundSpeedText)
+                    const groundSpeedTextWidth  = groundSpeedMetrics.width
+                    const groundSpeedTextHeight = hudSpeedTextHeightPx
+                    const groundSpeedRectWidth  = groundSpeedTextWidth + groundSpeedPadX * 2
+                    const groundSpeedRectHeight = groundSpeedTextHeight + groundSpeedPadY * 4
 
-                    // Box to the LEFT of the vertical line
-                    const spdRectX = speedLineX - spdRectW - 12
-                    const spdRectY = ladderCenterY - spdRectH / 2
+                    const speedRectGapToCenterLine = hudSpeedLabelGapPx
+                    const speedRectX = speedLineX - groundSpeedRectWidth - speedRectGapToCenterLine
+                    const speedRectY = ladderCenterY - groundSpeedRectHeight / 2
 
-                    const spdLabelTop    = spdRectY
-                    const spdLabelBottom = spdRectY + spdRectH
+                    const speedLabelTop    = speedRectY
+                    const speedLabelBottom = speedRectY + groundSpeedRectHeight
 
                     // --- SPEED ticks (full ladder) ---
                     for (let j = -ticksVisible; j <= ticksVisible; j++) {
-                        const tickVal = baseSpd + j * spdTickStep
-                        const y = yForTick(spdNow, tickVal, spdTickStep)
+                        const tickValue = baseSpeed + j * speedTickStep
+                        const tickY = yForTick(groundSpeedNow, tickValue, speedTickStep)
 
-                        // Clamp to ladder window
-                        if (y < ladderTop || y > ladderBottom) continue
+                        if (tickY < ladderTop || tickY > ladderBottom) {
+                            continue
+                        }
 
-                        const major = isMajor(tickVal, spdMajorEvery)
-                        ctx.lineWidth = major ? majorTickWidth : minorTickWidth
-                        const thisTickLen = major ? majorTickLen : minorTickLen
+                        const majorTick      = ismallajorTick(tickValue, speedMajorEvery)
+                        context.lineWidth    = majorTick ? majorTickWidth : minorTickWidth
+                        const thisTickLength = majorTick ? majorTickLength : minorTickLength
 
-                        const inLabelBand = (y >= spdLabelTop && y <= spdLabelBottom)
+                        const inLabelBand = (tickY >= speedLabelTop && tickY <= speedLabelBottom)
 
-                        let tickStartX, tickEndX
+                        let tickStartX
+                        let tickEndX
 
                         if (inLabelBand) {
-                            tickStartX = spdRectX + spdRectW
+                            tickStartX = speedRectX + groundSpeedRectWidth
                             tickEndX   = speedLineX
                         } else {
-                            tickStartX = speedLineX - thisTickLen
+                            tickStartX = speedLineX - thisTickLength
                             tickEndX   = speedLineX
                         }
 
-                        ctx.beginPath()
-                        ctx.moveTo(tickStartX, y)
-                        ctx.lineTo(tickEndX,   y)
-                        ctx.stroke()
+                        context.beginPath()
+                        context.moveTo(tickStartX, tickY)
+                        context.lineTo(tickEndX,   tickY)
+                        context.stroke()
 
-                        if (major && !inLabelBand) {
-                            const label = Math.round(tickVal).toString()
-                            const gap   = 6
-                            const padLbl = 6
+                        if (majorTick && !inLabelBand) {
+                            const labelText    = Math.round(tickValue).toString()
+                            const labelGapPx   = 6
 
-                            ctx.save()
-                            ctx.font         = "13px sans-serif"
-                            ctx.textBaseline = "middle"
-                            ctx.textAlign    = "right"
-                            ctx.fillStyle    = cGreen
+                            context.save()
+                            context.font         = "13px sans-serif"
+                            context.textBaseline = "middle"
+                            context.textAlign    = "right"
+                            context.fillStyle    = cGreen
 
-                            const labelX = tickStartX - gap
-                            ctx.fillText(label, labelX - padLbl + padLbl, y)
-                            ctx.restore()
+                            const labelX = tickStartX - labelGapPx
+                            context.fillText(labelText, labelX, tickY)
+                            context.restore()
                         }
                     }
 
-                    ctx.save()
-                    ctx.globalAlpha = 0.5
-                    ctx.fillStyle   = "#000000"
-                    ctx.fillRect(spdRectX, spdRectY, spdRectW, spdRectH)
-                    ctx.restore()
+                    context.save()
+                    context.globalAlpha = 0.5
+                    context.fillStyle   = cFill
+                    context.fillRect(speedRectX, speedRectY,
+                                     groundSpeedRectWidth, groundSpeedRectHeight)
+                    context.restore()
 
-                    ctx.lineWidth   = 2
-                    ctx.strokeStyle = cGreen
-                    ctx.strokeRect(spdRectX + 0.5, spdRectY + 0.5, spdRectW - 1, spdRectH - 1)
+                    const strokePixelOffset = hudStrokePixelOffset
+                    context.lineWidth   = 2
+                    context.strokeStyle = cGreen
+                    context.strokeRect(speedRectX + strokePixelOffset,
+                                       speedRectY + strokePixelOffset,
+                                       groundSpeedRectWidth  - 2 * strokePixelOffset,
+                                       groundSpeedRectHeight - 2 * strokePixelOffset)
 
-                    ctx.fillStyle = cGreen
-                    ctx.fillText(spdText, spdRectX + spdRectW - padX, ladderCenterY)
+                    context.fillStyle = cGreen
+                    context.fillText(groundSpeedText,
+                                     speedRectX + groundSpeedRectWidth - groundSpeedPadX,
+                                     ladderCenterY)
                 }
 
                 // ---------------------------------------------
                 // 3) Crosshair
                 // ---------------------------------------------
-                ctx.strokeStyle = cGreen
-                ctx.lineWidth = thick
+                context.strokeStyle = cGreen
+                context.lineWidth = thick
 
-                const cx = width / 2
-                const cy = horizonY
-                const gapHalf2 = 20
-                const armLen = gapHalf2 + 18
+                const centerX    = width / 2
+                const centerY    = horizonY
+                const crossGap   = hudCrossGapPx
+                const armLength  = crossGap + hudCrossArmExtraPx
 
-                ctx.beginPath(); ctx.moveTo(cx, cy - armLen); ctx.lineTo(cx, cy - gapHalf2); ctx.stroke()
-                ctx.beginPath(); ctx.moveTo(cx, cy + gapHalf2); ctx.lineTo(cx, cy + armLen); ctx.stroke()
-                ctx.beginPath(); ctx.moveTo(cx - armLen, cy);   ctx.lineTo(cx - gapHalf2, cy); ctx.stroke()
-                ctx.beginPath(); ctx.moveTo(cx + armLen, cy);   ctx.lineTo(cx + gapHalf2, cy); ctx.stroke()
+                // vertical up
+                context.beginPath()
+                context.moveTo(centerX, centerY - armLength)
+                context.lineTo(centerX, centerY - crossGap)
+                context.stroke()
+
+                // vertical down
+                context.beginPath()
+                context.moveTo(centerX, centerY + crossGap)
+                context.lineTo(centerX, centerY + armLength)
+                context.stroke()
+
+                // horizontal left
+                context.beginPath()
+                context.moveTo(centerX - armLength, centerY)
+                context.lineTo(centerX - crossGap,  centerY)
+                context.stroke()
+
+                // horizontal right
+                context.beginPath()
+                context.moveTo(centerX + crossGap,  centerY)
+                context.lineTo(centerX + armLength, centerY)
+                context.stroke()
             }
         }
 
@@ -612,34 +848,34 @@ Item {
     // ---------- Bottom-center compass using QGC vehicle heading ----------
     Item {
         id: bottomCompass
-        readonly property real minSizePx:   ScreenTools.defaultFontPixelHeight * 8
-        readonly property real targetFrac:  0.15
+
+        readonly property real minSizePx:   ScreenTools.defaultFontPixelHeight * hudCompassmallinSizeMult
+        readonly property real targetFrac:  hudCompassTargetWidthFrac
 
         readonly property real screenWidth: Qt.application && Qt.application.screens.length > 0
                                             ? Qt.application.screens[0].width
                                             : width
 
-        // Special sizes
-        readonly property real bigSizePx:   ScreenTools.defaultFontPixelHeight * 18
-        readonly property real maxSizePx:   ScreenTools.defaultFontPixelHeight * 14
-        readonly property real halfEpsPx:   ScreenTools.defaultFontPixelHeight * 2
+        readonly property real bigSizePx:   ScreenTools.defaultFontPixelHeight * hudCompassBigSizeMult
+        readonly property real maxSizePx:   ScreenTools.defaultFontPixelHeight * hudCompassmallaxSizeMult
+        readonly property real halfEpsPx:   ScreenTools.defaultFontPixelHeight * hudCompassHalfEpsmallult
 
         readonly property bool _inMainWin: Window.window && Window.window === mainWindow
-        readonly property bool _fillsMainWin: _inMainWin &&
-                                            Math.abs(hud.width - Window.window.width) <
+        readonly property bool _fillsmallainWin: _inMainWin &&
+                                              Math.abs(hud.width - Window.window.width) <
                                                 ScreenTools.defaultFontPixelHeight
-        readonly property bool _useFancySizing: _fillsMainWin
+        readonly property bool _useFancySizing: _fillsmallainWin
 
         width: {
-            const hw   = hud.width
-            const normalScaled = Math.max(minSizePx, hw * targetFrac)
+            const hudWidth         = hud.width
+            const normalScaledSize = Math.max(minSizePx, hudWidth * targetFrac)
             if (!_useFancySizing) {
-                return normalScaled
+                return normalScaledSize
             }
-            const half = screenWidth / 2
-            if (hw < half - halfEpsPx) {
-                return normalScaled
-            } else if (Math.abs(hw - half) <= halfEpsPx) {
+            const halfScreenWidth = screenWidth / 2
+            if (hudWidth < halfScreenWidth - halfEpsPx) {
+                return normalScaledSize
+            } else if (Math.abs(hudWidth - halfScreenWidth) <= halfEpsPx) {
                 return bigSizePx
             } else {
                 return maxSizePx
@@ -650,30 +886,29 @@ Item {
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.bottom: parent.bottom
         anchors.bottomMargin: hud.pad * 2
-        visible: hud.hudCompassMode === 1
+        visible: hud.hudCompassmallode === 1
         property color compassColor: cGreen
-        readonly property real compassRadius: Math.min(width, height) * 0.40
+        readonly property real compassRadius: Math.min(width, height) * hudCompassRadiusFraction
 
         readonly property real launchHeadingDeg: {
-            if (vehicle && vehicle.headingToHome && _finite(vehicle.headingToHome.rawValue)) {
-                return vehicle.headingToHome.rawValue
+            if (vehicle && vehicle.headingToHome && isFiniteNumber(vehicle.headingToHome.rawValue)) {
+                return normalizeAngle360(vehicle.headingToHome.rawValue)
             }
-            if (vehicle && vehicle.headingToNextWP && _finite(vehicle.headingToNextWP.rawValue)) {
-                return vehicle.headingToNextWP.rawValue
+            if (vehicle && vehicle.headingToNextWP && isFiniteNumber(vehicle.headingToNextWP.rawValue)) {
+                return normalizeAngle360(vehicle.headingToNextWP.rawValue)
             }
             return NaN
         }
-        function showLaunchIndicator() { return _finite(bottomCompass.launchHeadingDeg) }
+        function showLaunchIndicator() { return isFiniteNumber(bottomCompass.launchHeadingDeg) }
 
         readonly property real headingDeg: {
-            if (!vehicle || !vehicle.heading) return 0
-            const h = (vehicle.heading.rawValue !== undefined) ? vehicle.heading.rawValue : vehicle.heading
-            return _finite(h) ? h : 0
+            const heading = getHeading()
+            return isFiniteNumber(heading) ? heading : 0
         }
 
         MouseArea {
             anchors.fill: parent
-            onClicked: hud.hudCompassMode = hud.hudCompassMode === 0 ? 1 : 0
+            onClicked: hud.hudCompassmallode = hud.hudCompassmallode === 0 ? 1 : 0
         }
 
         // 1) COMPASS DIAL
@@ -683,95 +918,107 @@ Item {
             antialiasing: true
 
             onPaint: {
-                const ctx = getContext("2d")
-                ctx.reset && ctx.reset()
-                ctx.clearRect(0, 0, width, height)
+                const context = getContext("2d")
+                context.reset && context.reset()
+                context.clearRect(0, 0, width, height)
 
-                const cx = width / 2
-                const cy = height / 2
-                const outerR = bottomCompass.compassRadius
-                const innerR = outerR * 0.85
+                const centerX = width / 2
+                const centerY = height / 2
+                const outerRadius = bottomCompass.compassRadius
+                const innerRadius = outerRadius * hudCompassInnerRadiusFactor
                 const heading = bottomCompass.headingDeg
 
-                ctx.save()
-                ctx.translate(cx, cy)
-                ctx.rotate(-heading * Math.PI / 180)
-                ctx.translate(-cx, -cy)
+                context.save()
+                context.translate(centerX, centerY)
+                context.rotate(-heading * Math.PI / 180)
+                context.translate(-centerX, -centerY)
 
                 // OUTER ring
-                ctx.beginPath()
-                ctx.arc(cx, cy, outerR, 0, Math.PI * 2, false)
-                ctx.fillStyle = "rgba(0,0,0,0.35)"; ctx.fill()
-                ctx.beginPath()
-                ctx.arc(cx, cy, outerR, 0, Math.PI * 2, false)
-                ctx.lineWidth = 2
-                ctx.strokeStyle = "rgba(255,255,255,0.35)"; ctx.stroke()
+                context.beginPath()
+                context.arc(centerX, centerY, outerRadius, 0, Math.PI * 2, false)
+                context.fillStyle = hud.compassOuterFillColor
+                context.fill()
+                context.beginPath()
+                context.arc(centerX, centerY, outerRadius, 0, Math.PI * 2, false)
+                context.lineWidth = 2
+                context.strokeStyle = hud.compassOuterStrokeColor
+                context.stroke()
 
                 // INNER disk
-                ctx.beginPath()
-                ctx.arc(cx, cy, innerR, 0, Math.PI * 2, false)
-                ctx.fillStyle = "rgba(0,0,0,0.20)"; ctx.fill()
+                context.beginPath()
+                context.arc(centerX, centerY, innerRadius, 0, Math.PI * 2, false)
+                context.fillStyle = hud.compassInnerFillColor
+                context.fill()
 
                 // sectors
-                const sectors = 8
-                ctx.save(); ctx.translate(cx, cy)
-                for (let i = 0; i < sectors; i++) {
-                    ctx.beginPath(); ctx.moveTo(0, 0)
-                    const a0 = (i * 2 * Math.PI / sectors) - Math.PI/2
-                    const a1 = ((i + 1) * 2 * Math.PI / sectors) - Math.PI/2
-                    ctx.arc(0, 0, innerR, a0, a1, false)
-                    ctx.closePath()
-                    ctx.fillStyle = (i % 2 === 0) ? "rgba(120,120,120,0.05)" : "rgba(120,120,120,0.14)"
-                    ctx.fill()
+                const sectors = hudCompassCardinalCount
+                context.save()
+                context.translate(centerX, centerY)
+                for (let sectorIndex = 0; sectorIndex < sectors; sectorIndex++) {
+                    context.beginPath()
+                    context.moveTo(0, 0)
+                    const startAngle = (sectorIndex * 2 * Math.PI / sectors) - Math.PI / 2
+                    const endAngle   = ((sectorIndex + 1) * 2 * Math.PI / sectors) - Math.PI / 2
+                    context.arc(0, 0, innerRadius, startAngle, endAngle, false)
+                    context.closePath()
+                    context.fillStyle = (sectorIndex % 2 === 0)
+                                        ? "rgba(120,120,120,0.05)"
+                                        : "rgba(120,120,120,0.14)"
+                    context.fill()
                 }
-                ctx.restore()
+                context.restore()
 
                 // ticks + cardinals
-                ctx.save(); ctx.translate(cx, cy)
+                context.save()
+                context.translate(centerX, centerY)
                 const cardinals = [
-                    {deg: 0,   label: "N"},
-                    {deg: 90,  label: "E"},
-                    {deg: 180, label: "S"},
-                    {deg: 270, label: "W"}
+                    { deg: 0,   label: "N" },
+                    { deg: 90,  label: "E" },
+                    { deg: 180, label: "S" },
+                    { deg: 270, label: "W" }
                 ]
-                for (let a = 0; a < 360; a += 30) {
-                    const rad = (a - 90) * Math.PI / 180
-                    const r1 = outerR - 2, r2 = outerR - 10
-                    ctx.beginPath()
-                    ctx.moveTo(Math.cos(rad)*r1, Math.sin(rad)*r1)
-                    ctx.lineTo(Math.cos(rad)*r2, Math.sin(rad)*r2)
-                    ctx.lineWidth = 2
-                    ctx.strokeStyle = "rgba(255,255,255,0.4)"
-                    ctx.stroke()
+                for (let angle = 0; angle < 360; angle += hudCompassTickStepDeg) {
+                    const radians = (angle - 90) * Math.PI / 180
+                    const tickOuterRadius = outerRadius - hudCompassTickOuterOffsetPx
+                    const tickInnerRadius = outerRadius - hudCompassTickInnerOffsetPx
+                    context.beginPath()
+                    context.moveTo(Math.cos(radians) * tickOuterRadius,
+                                   Math.sin(radians) * tickOuterRadius)
+                    context.lineTo(Math.cos(radians) * tickInnerRadius,
+                                   Math.sin(radians) * tickInnerRadius)
+                    context.lineWidth = 2
+                    context.strokeStyle = hud.compassTickStrokeColor
+                    context.stroke()
                 }
-                ctx.fillStyle = "#ffffff"
-                ctx.font = "bold " + (outerR * 0.20) + "px sans-serif"
-                ctx.textAlign = "center"
-                ctx.textBaseline = "middle"
-                cardinals.forEach(function(c) {
-                    const rad = (c.deg - 90) * Math.PI / 180
-                    const rtxt = outerR - 16
-                    ctx.save()
-                    ctx.translate(Math.cos(rad)*rtxt, Math.sin(rad)*rtxt)
-                    ctx.fillText(c.label, 0, 0)
-                    ctx.restore()
+                context.fillStyle = hud.compassCardinalTextColor
+                context.font = "bold " + (outerRadius * hudCompassCardinalFontFrac) + "px sans-serif"
+                context.textAlign = "center"
+                context.textBaseline = "middle"
+                cardinals.forEach(function(cardinal) {
+                    const radians = (cardinal.deg - 90) * Math.PI / 180
+                    const textRadius = outerRadius - hudCompassCardinalTextOffsetPx
+                    context.save()
+                    context.translate(Math.cos(radians) * textRadius,
+                                      Math.sin(radians) * textRadius)
+                    context.fillText(cardinal.label, 0, 0)
+                    context.restore()
                 })
-                ctx.restore(); ctx.restore()
+                context.restore()
+                context.restore()
 
                 // fixed heading number
-                const headingStr = ("000" + Math.round(heading)).slice(-3)
+                const headingString = ("000" + Math.round(heading)).slice(-3)
 
-                const headingFontSize = outerR * 0.22
-                ctx.font = "bold " + headingFontSize + "px sans-serif"
-                ctx.textAlign = "center"
-                ctx.textBaseline = "bottom"
-                ctx.fillStyle = "rgba(0,255,128,0.95)"
+                const headingFontSize = outerRadius * hudHeadingFontSizeFrac
+                context.font = "bold " + headingFontSize + "px sans-serif"
+                context.textAlign = "center"
+                context.textBaseline = "bottom"
+                context.fillStyle = hud.headingTextColor
 
-                const desiredY = cy - outerR - 4
-                const minBaselineY = headingFontSize + 4 // minimum baseline
-                const textY = Math.max(minBaselineY, desiredY)
-                ctx.fillText(headingStr, cx, textY)
-
+                const desiredBaselineY   = centerY - outerRadius - hudHeadingBaselineOffsetPx
+                const minimumBaselineY   = headingFontSize + hudHeadingBaselineOffsetPx
+                const textBaselineY      = Math.max(minimumBaselineY, desiredBaselineY)
+                context.fillText(headingString, centerX, textBaselineY)
             }
         }
 
@@ -795,23 +1042,25 @@ Item {
                 antialiasing: true
 
                 onPaint: {
-                    const ctx = getContext("2d")
-                    ctx.clearRect(0,0,width,height)
+                    const context = getContext("2d")
+                    context.clearRect(0,0,width,height)
 
-                    const cx = width/2
-                    const cy = height/2
-                    const len = Math.min(width, height) * 0.40
+                    const centerX = width/2
+                    const centerY = height/2
+                    const arrowLength = Math.min(width, height) * hudCompassRadiusFraction
 
-                    ctx.beginPath()
-                    ctx.moveTo(cx, cy - len/4)
-                    ctx.lineTo(cx - 6, cy)
-                    ctx.lineTo(cx + 6, cy)
-                    ctx.closePath()
-                    ctx.fillStyle = "rgba(180,255,26,0.5)"; ctx.fill()
+                    context.beginPath()
+                    context.moveTo(centerX, centerY - arrowLength / 4)
+                    context.lineTo(centerX - 6, centerY)
+                    context.lineTo(centerX + 6, centerY)
+                    context.closePath()
+                    context.fillStyle = hud.headingArrowFillColor
+                    context.fill()
 
-                    ctx.beginPath()
-                    ctx.arc(cx, cy, 3, 0, Math.PI*2, false)
-                    ctx.fillStyle = cGreen; ctx.fill()
+                    context.beginPath()
+                    context.arc(centerX, centerY, 3, 0, Math.PI*2, false)
+                    context.fillStyle = cGreen
+                    context.fill()
                 }
             }
         }
@@ -819,37 +1068,37 @@ Item {
         Rectangle {
             id: launchIndicator
             visible: bottomCompass.showLaunchIndicator()
-            width: 22
-            height: 22
+            width:  hudLaunchIndicatorSizePx
+            height: hudLaunchIndicatorSizePx
             radius: width / 2
             color: "red"
 
-            property real _relAngleDeg: {
-                if (!visible || !Number.isFinite(bottomCompass.launchHeadingDeg))
+            property real _relativeAngleDeg: {
+                if (!visible || !isFiniteNumber(bottomCompass.launchHeadingDeg)) {
                     return 0
-                var a = bottomCompass.launchHeadingDeg - bottomCompass.headingDeg
-                a = ((a % 360) + 360) % 360
-                return a
+                }
+                const headingDifference = bottomCompass.launchHeadingDeg - bottomCompass.headingDeg
+                return normalizeAngle360(headingDifference)
             }
 
             x: {
                 if (!visible) return 0
-                const a = _relAngleDeg * Math.PI / 180.0
-                const cx = bottomCompass.width / 2
-                return cx + bottomCompass.compassRadius * Math.sin(a) - width / 2
+                const radians = _relativeAngleDeg * Math.PI / 180.0
+                const centerX = bottomCompass.width / 2
+                return centerX + bottomCompass.compassRadius * Math.sin(radians) - width / 2
             }
             y: {
                 if (!visible) return 0
-                const a = _relAngleDeg * Math.PI / 180.0
-                const cy = bottomCompass.height / 2
-                return cy - bottomCompass.compassRadius * Math.cos(a) - height / 2
+                const radians = _relativeAngleDeg * Math.PI / 180.0
+                const centerY = bottomCompass.height / 2
+                return centerY - bottomCompass.compassRadius * Math.cos(radians) - height / 2
             }
 
             QGCLabel {
                 anchors.centerIn: parent
                 text: "L"
                 font.bold: true
-                color: "black"
+                color: cGreen
             }
         }
 
@@ -864,42 +1113,38 @@ Item {
                 width: bottomCompass.width
                 height: bottomCompass.height
 
-                function norm360(d) {
-                    return ((d % 360) + 360) % 360
-                }
-                function wrap180(d) {
-                    let a = ((d + 180) % 360 + 360) % 360
-                    return a - 180
-                }
+                property real _lastGoodAbsoluteYaw: 0
+                property bool _hasLastGoodYaw: false
 
-                property real _lastGoodAbsYaw: 0
-                property bool _haveLast: false
+                readonly property bool _absoluteYawValid: object
+                                                        && object.absoluteYaw
+                                                        && isFiniteNumber(object.absoluteYaw.rawValue)
+                readonly property real _absoluteYawDeg: _absoluteYawValid
+                                                        ? object.absoluteYaw.rawValue
+                                                        : (_hasLastGoodYaw ? _lastGoodAbsoluteYaw : 0)
 
-                readonly property bool _absYawValid: object && object.absoluteYaw && Number.isFinite(object.absoluteYaw.rawValue)
-                readonly property real _absYawDeg: _absYawValid ? object.absoluteYaw.rawValue
-                                                            : (_haveLast ? _lastGoodAbsYaw : 0)
-
-                readonly property real droneHeading: norm360(bottomCompass.headingDeg)
-
-                readonly property real _rel1: wrap180(norm360(_absYawDeg) - droneHeading)
-                readonly property real _rel2: wrap180(norm360(_absYawDeg + 90) - droneHeading)
+                readonly property real droneHeadingDeg: normalizeAngle360(bottomCompass.headingDeg)
 
                 property real mountYawOffsetDeg: 0
 
                 readonly property real relAngleDeg: {
-                    if (!_absYawValid || !Number.isFinite(droneHeading)) return 0
-                    return wrap180(norm360(_absYawDeg + mountYawOffsetDeg) - droneHeading)
+                    if (!_absoluteYawValid || !isFiniteNumber(droneHeadingDeg)) {
+                        return 0
+                    }
+                    const absoluteYawWithOffset = _absoluteYawDeg + mountYawOffsetDeg
+                    return normalizeAngle180(absoluteYawWithOffset - droneHeadingDeg)
                 }
 
-                // readonly property real relAngleDeg: (Math.abs(_rel1) <= Math.abs(_rel2)) ? _rel1 : _rel2
-
-                on_AbsYawDegChanged: {
-                    if (_absYawValid) { _lastGoodAbsYaw = _absYawDeg; _haveLast = true }
+                on_AbsoluteYawDegChanged: {
+                    if (_absoluteYawValid) {
+                        _lastGoodAbsoluteYaw = _absoluteYawDeg
+                        _hasLastGoodYaw = true
+                    }
                 }
-
 
                 visible: vehicle
-                        && QGroundControl.settingsManager.gimbalControllerSettings.showAzimuthIndicatorOnMap.rawValue
+                         && QGroundControl.settingsmallanager.gimbalControllerSettings
+                                .showAzimuthIndicatorOnMap.rawValue
 
                 opacity: object === vehicle.gimbalController.activeGimbal ? 1.0 : 0.4
 
@@ -909,46 +1154,53 @@ Item {
                     antialiasing: true
 
                     onPaint: {
-                        const ctx = getContext("2d")
-                        ctx.clearRect(0,0,width,height)
+                        const context = getContext("2d")
+                        context.clearRect(0,0,width,height)
 
-                        const cx = width / 2
-                        const cy = height / 2
-                        const r  = bottomCompass.compassRadius - 1.5
+                        const centerX = width / 2
+                        const centerY = height / 2
+                        const radius  = bottomCompass.compassRadius - hudGimbalRadiusOffsetPx
 
-                        let aCenter = (gimbalItem.relAngleDeg) * Math.PI / 180.0
-                        aCenter -= Math.PI / 2
+                        let angleCenter = gimbalItem.relAngleDeg * Math.PI / 180.0
+                        angleCenter -= Math.PI / 2
 
-                        const spanDeg = 10
+                        const spanDeg = hudGimbalSpanDeg
                         const spanRad = spanDeg * Math.PI / 180.0
-                        const a1 = aCenter - spanRad/2
-                        const a2 = aCenter + spanRad/2
+                        const angleStart = angleCenter - spanRad/2
+                        const angleEnd   = angleCenter + spanRad/2
 
-                        ctx.beginPath()
-                        ctx.moveTo(cx, cy)
-                        ctx.arc(cx, cy, r, a1, a2, false)
-                        ctx.closePath()
-                        ctx.fillStyle = (gimbalItem.opacity === 1.0)
-                            ? "rgba(255,140,0,0.25)"
-                            : "rgba(255,140,0,0.15)"
-                        ctx.fill()
+                        context.beginPath()
+                        context.moveTo(centerX, centerY)
+                        context.arc(centerX, centerY, radius, angleStart, angleEnd, false)
+                        context.closePath()
+                        context.fillStyle = (gimbalItem.opacity === 1.0)
+                            ? hud.gimbalFillActiveColor
+                            : hud.gimbalFillInactiveColor
+                        context.fill()
 
-                        ctx.beginPath()
-                        ctx.lineWidth = 1.5
-                        ctx.strokeStyle = "rgba(0,0,0,0.4)"
-                        ctx.moveTo(cx, cy)
-                        ctx.lineTo(cx + Math.cos(a1) * r, cy + Math.sin(a1) * r)
-                        ctx.moveTo(cx, cy)
-                        ctx.lineTo(cx + Math.cos(a2) * r, cy + Math.sin(a2) * r)
-                        ctx.stroke()
+                        context.beginPath()
+                        context.lineWidth = hudGimbalStrokeWidthPx
+                        context.strokeStyle = hud.gimbalStrokeColor
+                        context.moveTo(centerX, centerY)
+                        context.lineTo(centerX + Math.cos(angleStart) * radius,
+                                       centerY + Math.sin(angleStart) * radius)
+                        context.moveTo(centerX, centerY)
+                        context.lineTo(centerX + Math.cos(angleEnd) * radius,
+                                       centerY + Math.sin(angleEnd) * radius)
+                        context.stroke()
                     }
                 }
 
-                Connections { target: bottomCompass; function onHeadingDegChanged() { gimbalCanvas.requestPaint() } }
-                Connections { target: object && object.absoluteYaw ? object.absoluteYaw : null
-                            function onRawValueChanged() { gimbalCanvas.requestPaint() } }
+                Connections {
+                    target: bottomCompass
+                    function onHeadingDegChanged() { gimbalCanvas.requestPaint() }
+                }
+                Connections {
+                    target: object && object.absoluteYaw ? object.absoluteYaw : null
+                    function onRawValueChanged() { gimbalCanvas.requestPaint() }
+                }
             }
         }
     }
-
 }
+

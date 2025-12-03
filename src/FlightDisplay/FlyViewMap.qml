@@ -53,7 +53,7 @@ FlightMap {
     property bool   _saveZoomLevelSetting:      true
 
 
-    // Choose valid visual parent fo popups
+    // Choose valid visual parent for popups
     function popupHostItem() {
         if (typeof globals !== "undefined" &&
             globals && globals.parent) {

@@ -2,15 +2,22 @@
 // QML-JS library: queue + backoff for Open-Elevation requests
 .pragma library
 
-var _queue = [];
-var _busy = false;
-var _delayMs = 0;
+var _queue    = [];
+var _busy     = false;
+var _delayMs  = 0;
 var _batchSize = 90;     // Open-Elevation likes <=100 points per call
-var _maxDelay = 15000;   // backoff cap 15s
+var _maxDelay  = 15000;
+var _minBackoffMs = 1000;
+
+function _increaseBackoff() {
+    var nextDelay = _delayMs ? _delayMs * 2 : _minBackoffMs;
+    _delayMs = Math.min(_maxDelay, Math.max(_minBackoffMs, nextDelay));
+}
 
 // Internal: pump the queue. Calls cb(...) provided by QML side.
 function _pump(cb) {
-    if (_busy) return;
+    if (_busy)
+        return;
 
     if (_queue.length === 0) {
         // Signal "nothing to do". QML handler checks for batch === null.
@@ -24,7 +31,7 @@ function _pump(cb) {
     // Provide three continuations to the QML caller:
     //  ok()           -> success, maybe reduce backoff and continue
     //  rateLimited()  -> got HTTP 429, increase backoff and ask QML to delay
-    //  fail()         -> other failure, increase backoff and continue
+    //  fail()         -> other failure, increase backoff and ask QML to delay
     cb(
         batch,
         0, // current suggested delay for this batch (handled in QML when batch===null)
@@ -36,15 +43,14 @@ function _pump(cb) {
         },
         function rateLimited() {
             _busy = false;
-            // exponential backoff with floor
-            _delayMs = Math.min(_maxDelay, Math.max(1000, _delayMs ? _delayMs * 2 : 1000));
+            _increaseBackoff();
             // Tell QML to wait _delayMs then call request() again (batch=null phase)
             cb(null, _delayMs);
         },
         function fail() {
             _busy = false;
-            _delayMs = Math.min(_maxDelay, Math.max(1000, _delayMs ? _delayMs * 2 : 1000));
-            _pump(cb);
+            _increaseBackoff();
+            cb(null, _delayMs);
         }
     );
 }
@@ -52,10 +58,12 @@ function _pump(cb) {
 // Public: enqueue points and start/continue pumping
 function request(points, cb) {
     if (points && points.length) {
-        for (var i = 0; i < points.length; i++) _queue.push(points[i]);
+        for (var i = 0; i < points.length; i++)
+            _queue.push(points[i]);
     }
 
-    if (_busy) return;
+    if (_busy)
+        return;
 
     if (_delayMs > 0) {
         // Ask QML to wait and then call back into request() (batch === null path)
