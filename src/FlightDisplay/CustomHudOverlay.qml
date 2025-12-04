@@ -93,8 +93,8 @@ Item {
     // Bottom compass sizing
     readonly property real hudCompassTargetWidthFrac:      0.15
     readonly property real hudCompassmallinSizeMult:          8
-    readonly property real hudCompassBigSizeMult:         18
-    readonly property real hudCompassmallaxSizeMult:         14
+    readonly property real hudCompassBigSizeMult:         12
+    readonly property real hudCompassmallaxSizeMult:         12
     readonly property real hudCompassHalfEpsmallult:          2
 
     readonly property real hudCompassRadiusFraction:       0.40
@@ -885,7 +885,7 @@ Item {
         height: width
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.bottom: parent.bottom
-        anchors.bottomMargin: hud.pad * 2
+        anchors.bottomMargin: hud.pad
         visible: hud.hudCompassmallode === 1
         property color compassColor: cGreen
         readonly property real compassRadius: Math.min(width, height) * hudCompassRadiusFraction
