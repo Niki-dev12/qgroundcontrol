@@ -4141,9 +4141,9 @@ void Vehicle::_handleSpatialUser3(const mavlink_command_long_t& cmd)
 {
     qDebug() << "User 3";
 
-    const double lat     = static_cast<double>(cmd.param5);
-    const double lon     = static_cast<double>(cmd.param6);
-    const double special = static_cast<double>(cmd.param7);
+    const double lat     = static_cast<double>(cmd.param1);
+    const double lon     = static_cast<double>(cmd.param2);
+    const double special = static_cast<double>(cmd.param3);
 
     // write into the base VehicleFactGroup (same as heading)
     specialLat()->setRawValue(lat);
@@ -4164,8 +4164,8 @@ void Vehicle::_handleCommandLong(const mavlink_message_t& message)
     if (commandLong.target_system != MAVLinkProtocol::instance()->getSystemId()) {
         return;
     }
-    // Handle 31007
-    if (commandLong.command == MAV_CMD_SPATIAL_USER_3) {
+    // Handle 31008
+    if (commandLong.command == MAV_CMD_SPATIAL_USER_4) {
         _handleSpatialUser3(commandLong);
         return;
     }
