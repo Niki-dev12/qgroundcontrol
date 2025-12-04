@@ -11,7 +11,6 @@ import QtQuick
 
 import QGroundControl
 import QGroundControl.Controls
-import QGroundControl.Controllers
 import QGroundControl.ScreenTools
 
 Item {
@@ -22,6 +21,8 @@ Item {
 
     property int    _track_rec_x:       0
     property int    _track_rec_y:       0
+    property real telemetryBottomInset: 0
+    property bool videoMinimized: false
 
     PipState {
         id:         videoPipState
@@ -257,4 +258,26 @@ Item {
         id: obstacleDistance
         showText: pipState.state === pipState.fullState
     }
+
+    CustomHudOverlay {
+        id: customHud
+        x: 0
+        y: 0
+        width:  _root.width
+        height: _root.height
+        z: 9999
+        visible: QGroundControl.videoManager.decoding && QGroundControl.videoManager.hudEnabled 
+
+        bottomUiInset:  videoControl.telemetryBottomInset
+        videoMinimized: videoControl.videoMinimized
+
+        onVideoMinimizedChanged: console.log("[HUD] videoMinimized ->", videoMinimized)
+
+
+        vehicle: QGroundControl.multiVehicleManager.activeVehicle
+        camera:  videoStreaming._camera
+        pipState: _root.pipState
+    }
+
+
 }

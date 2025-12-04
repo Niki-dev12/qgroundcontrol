@@ -815,3 +815,12 @@ void FinishVideoInitialization::run()
 {
     VideoManager::instance()->startVideo();
 }
+
+void VideoManager::setHudEnabled(bool enabled)
+{
+    const bool old = _hudEnabled.loadAcquire();
+    if (old == enabled)
+        return;
+    _hudEnabled.storeRelease(enabled);
+    emit hudEnabledChanged();
+}

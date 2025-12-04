@@ -6,6 +6,7 @@ qt_add_qml_module(FlightDisplayModule
     RESOURCE_PREFIX /qml
     QML_FILES
         CustomGuidedActionsController.qml
+        CustomHudOverlay.qml
         DefaultChecklist.qml
         FixedWingChecklist.qml
         FlightDisplayViewDummy.qml
@@ -61,6 +62,7 @@ qt_add_qml_module(FlightDisplayModule
         SubChecklist.qml
         TelemetryValuesBar.qml
         TerrainProgress.qml
+        TerrainFetch.js
         VehicleWarnings.qml
         VirtualJoystick.qml
     NO_PLUGIN # Required by Qt 6.6.3. TODO: Remove when no longer supported.

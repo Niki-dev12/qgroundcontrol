@@ -12,6 +12,8 @@ target_sources(${CMAKE_PROJECT_NAME}
         TerrainTile.h
         TerrainTileManager.cc
         TerrainTileManager.h
+        TerrainAheadSampler.cc
+        TerrainAheadSampler.h
 )
 
 target_include_directories(${CMAKE_PROJECT_NAME}

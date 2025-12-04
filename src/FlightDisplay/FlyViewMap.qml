@@ -52,6 +52,22 @@ FlightMap {
     property bool   _keepVehicleCentered:       pipMode ? true : false
     property bool   _saveZoomLevelSetting:      true
 
+
+    // Choose valid visual parent for popups
+    function popupHostItem() {
+        if (typeof globals !== "undefined" &&
+            globals && globals.parent) {
+            return globals.parent
+        }
+        if (_root.window && _root.window.contentItem) {
+            return _root.window.contentItem
+        }
+        if (typeof mainWindow !== "undefined" && mainWindow) {
+            return mainWindow
+        }
+        return _root
+    }
+
     function _adjustMapZoomForPipMode() {
         _saveZoomLevelSetting = false
         if (pipMode) {
@@ -578,11 +594,21 @@ FlightMap {
             anchors.fill: parent
             onClicked: (position) => {
                 position = Qt.point(position.x, position.y)
-                var clickCoord = _root.toCoordinate(position, false /* clipToViewPort */)
-                // For some strange reason using mainWindow in mapToItem doesn't work, so we use globals.parent instead which also gets us mainWindow
-                position = mapToItem(globals.parent, position)
-                var dropPanel = roiEditDropPanelComponent.createObject(mainWindow, { clickRect: Qt.rect(position.x, position.y, 0, 0) })
-                dropPanel.open()
+                var windowItem = (_root.window && _root.window.contentItem)
+                                 ? _root.window.contentItem
+                                 : _root
+
+                var hostPos = roiLocationItem.mapToItem(windowItem, position)
+
+                var dropPanel = roiEditDropPanelComponent.createObject(windowItem, {
+                    clickRect: Qt.rect(hostPos.x, hostPos.y, 0, 0)
+                })
+
+                if (!dropPanel) {
+                    console.log("[ROI] Failed to create roiEditDropPanel")
+                } else {
+                    dropPanel.open()
+                }
             }
         }
 
@@ -756,17 +782,29 @@ FlightMap {
     }
 
     onMapClicked: (position) => {
-        if (!globals.guidedControllerFlyView.guidedUIVisible && 
-            (globals.guidedControllerFlyView.showGotoLocation || globals.guidedControllerFlyView.showOrbit ||
-             globals.guidedControllerFlyView.showROI || globals.guidedControllerFlyView.showSetHome ||
+        if (!globals.guidedControllerFlyView.guidedUIVisible &&
+            (globals.guidedControllerFlyView.showGotoLocation ||
+             globals.guidedControllerFlyView.showOrbit ||
+             globals.guidedControllerFlyView.showROI ||
+             globals.guidedControllerFlyView.showSetHome ||
              globals.guidedControllerFlyView.showSetEstimatorOrigin)) {
 
             position = Qt.point(position.x, position.y)
             var clickCoord = _root.toCoordinate(position, false /* clipToViewPort */)
-            // For some strange reason using mainWindow in mapToItem doesn't work, so we use globals.parent instead which also gets us mainWindow
-            position = _root.mapToItem(globals.parent, position)
-            var dropPanel = mapClickDropPanelComponent.createObject(mainWindow, { mapClickCoord: clickCoord, clickRect: Qt.rect(position.x, position.y, 0, 0) })
-            dropPanel.open()
+            var windowItem = (_root.window && _root.window.contentItem)
+                             ? _root.window.contentItem
+                             : _root
+            var hostPos = _root.mapToItem(windowItem, position)
+            var dropPanel = mapClickDropPanelComponent.createObject(windowItem, {
+                mapClickCoord: clickCoord,
+                clickRect: Qt.rect(hostPos.x, hostPos.y, 0, 0)
+            })
+
+            if (!dropPanel) {
+                console.log("[FlyViewMap] Failed to create mapClickDropPanel")
+            } else {
+                dropPanel.open()
+            }
         }
     }
 
