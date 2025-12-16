@@ -374,6 +374,85 @@ FlightMap {
         }
     }
 
+    MapItemView {
+        model: _activeVehicle ? _activeVehicle.geopixelDetections : null
+
+        delegate: MapQuickItem {
+            id: detectionItem
+            z: QGroundControl.zOrderTopMost
+
+            coordinate: object.coordinate
+
+            anchorPoint.x: sourceItem.width  / 2
+            anchorPoint.y: sourceItem.height / 2
+
+            sourceItem: Item {
+                id: markerRoot
+
+                property int cls: object ? object.classId  : -1
+                property int oid: object ? object.objectId : -1
+
+                property bool selected: false
+
+                width:  ScreenTools.defaultFontPixelHeight * 1.8
+                height: width
+
+                property color baseColor: cls === 1 ? "#ff4040"
+                                    : cls === 2 ? "#40c040"
+                                    :              "#f0d040"
+
+                property color selectedColor: Qt.lighter(baseColor, 1.8)
+
+                Rectangle {
+                    id: circle
+                    anchors.fill: parent
+                    radius: width / 2
+
+                    color: markerRoot.selected ? markerRoot.selectedColor : markerRoot.baseColor
+
+                    antialiasing: true
+                    border.color: markerRoot.selected ? "black" : Qt.darker(markerRoot.baseColor, 1.4)
+                    border.width: markerRoot.selected ? 3 : 2
+
+                    gradient: Gradient {
+                        GradientStop { position: 0.0; color: Qt.lighter(circle.color, 1.5) }
+                        GradientStop { position: 0.4; color: circle.color }
+                        GradientStop { position: 1.0; color: Qt.darker(circle.color, 1.5) }
+                    }
+                }
+
+                Text {
+                    anchors.centerIn: parent
+                    text: markerRoot.oid >= 0 ? String(markerRoot.oid) : "?"
+                    font.bold: true
+                    font.pixelSize: parent.height * 0.35
+                    color: "black"
+                    z: 10
+                }
+
+                MouseArea {
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+
+                    onClicked: {
+                        markerRoot.selected = !markerRoot.selected
+
+                        console.log("[GeoMarker] clicked objectId =", markerRoot.oid)
+
+                        if (_root && object && object.coordinate.isValid) {
+                            _root.center = object.coordinate
+                        }
+                    }
+                }
+
+                Component.onCompleted: {
+                    console.log("[GeoMarker] created → oid =", markerRoot.oid)
+                }
+            }
+        }
+    }
+
     // GoTo Location forward flight circle visuals
     QGCMapCircleVisuals {
         id:                 fwdFlightGotoMapCircle

@@ -75,6 +75,7 @@ class TrajectoryPoints;
 class VehicleBatteryFactGroup;
 class VehicleObjectAvoidance;
 class GimbalController;
+class GeopixelDetection;
 #ifdef QGC_UTM_ADAPTER
 class UTMSPVehicle;
 #endif
@@ -414,6 +415,10 @@ public:
     Q_INVOKABLE void saveJoystickSettings(void);
 
     Q_INVOKABLE void sendSetupSigning();
+
+    Q_INVOKABLE void boundingBoxClick(float xClick, float yClick, float xDisplay, float yDisplay, float boxWidth, float boxHeight);
+
+    void getCurrentGstreamSize(float width, float height);
 
     bool    isInitialConnectComplete() const;
     bool    guidedModeSupported     () const;
@@ -979,7 +984,8 @@ private:
 #endif
     void _handleCameraImageCaptured     (const mavlink_message_t& message);
     void _handleCommandLong             (const mavlink_message_t& message);
-    void _handleSpatialUser3            (const mavlink_command_long_t& cmd);
+    void _handleSpatialUser4            (const mavlink_command_long_t& cmd);
+    QString _latLonToMgrs               (double latitudeDeg, double longitudeDeg, int meterPrecision);
     void _missionManagerError           (int errorCode, const QString& errorMsg);
     void _geoFenceManagerError          (int errorCode, const QString& errorMsg);
     void _rallyPointManagerError        (int errorCode, const QString& errorMsg);
@@ -1346,6 +1352,7 @@ private:
     Q_PROPERTY(int     operatorControlTakeoverTimeoutMsecs   READ operatorControlTakeoverTimeoutMsecs   CONSTANT)
     Q_PROPERTY(int     requestOperatorControlRemainingMsecs  READ requestOperatorControlRemainingMsecs  CONSTANT)
     Q_PROPERTY(bool    sendControlRequestAllowed             READ sendControlRequestAllowed             NOTIFY sendControlRequestAllowedChanged)
+    Q_PROPERTY(QmlObjectListModel* geopixelDetections READ geopixelDetections CONSTANT)
 
     uint8_t sysidInControl() const { return _sysid_in_control; }
     bool    gcsControlStatusFlags_SystemManager() const { return _gcsControlStatusFlags_SystemManager; }
@@ -1396,6 +1403,8 @@ public:
     QString formattedMessages() const;
 
     // StatusTextHandler* statusTextHandler() { return m_statusTextHandler; }
+
+    QmlObjectListModel* geopixelDetections() { return &_geopixelDetections; }
 
 signals:
     void textMessageReceived(int sysid, int componentid, int severity, QString text, QString description);
@@ -1452,6 +1461,9 @@ private:
     void _createMAVLinkLogManager();
 
     MAVLinkLogManager *_mavlinkLogManager = nullptr;
+
+    QmlObjectListModel          _geopixelDetections { this };
+    QHash<int, GeopixelDetection*> _geopixelDetectionsById;
 
 /*---------------------------------------------------------------------------*/
 };

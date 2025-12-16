@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *  SpatialUser3Instrument.qml
+ *  SpatialUser4Instrument.qml
  *  Instrument-style widget for specialLat / specialLon / specialData
  *
  ****************************************************************************/
@@ -13,7 +13,7 @@ import QGroundControl.Vehicle
 import QGroundControl.Palette
 
 Rectangle {
-    id: control
+    id: instrumentRoot
 
     implicitWidth:  ScreenTools.defaultFontPixelHeight * 12
     implicitHeight: ScreenTools.defaultFontPixelHeight * 2.8
@@ -22,19 +22,25 @@ Rectangle {
 
     property real extraInset:       0
     property real extraValuesWidth: implicitWidth
+    readonly property int  windowWidthFactor:       3
+    readonly property int  coordinatePrecision:     5
 
     property var vehicle: QGroundControl.multiVehicleManager.activeVehicle
 
-    QGCPalette { id: qgcPal; colorGroupEnabled: true }
+    QGCPalette {
+        id: qgcPalette
+        colorGroupEnabled: true
+    }
 
-    color:       qgcPal.window
-    border.color:qgcPal.text
-    radius:      ScreenTools.defaultFontPixelHeight * 0.5
+    color:        qgcPalette.window
+    border.color: qgcPalette.text
+    radius:       ScreenTools.defaultFontPixelHeight * 0.5
 
-    function fmt(value, digits) {
-        return (value === undefined || value === null || isNaN(value))
-                ? "--"
-                : Number(value).toFixed(digits)
+    function formatValue(numericValue, digitsCount) {
+        if (numericValue === undefined || numericValue === null || isNaN(numericValue)) {
+            return "--"
+        }
+        return Number(numericValue).toFixed(digitsCount)
     }
 
     Column {
@@ -45,27 +51,26 @@ Rectangle {
         // -------------------------
         // ROW 1: STATIC LABEL HEADERS
         // -------------------------
-        
         Row {
             width: parent.width
             spacing: ScreenTools.defaultFontPixelWidth
 
             QGCLabel {
-                width: parent.width / 3
+                width: parent.width / windowWidthFactor
                 horizontalAlignment: Text.AlignHCenter
-                text: "Lat"
+                text: qsTr("Lat:")
             }
 
             QGCLabel {
-                width: parent.width / 3
+                width: parent.width / windowWidthFactor
                 horizontalAlignment: Text.AlignHCenter
-                text: "Lon"
+                text: qsTr("Lon:")
             }
 
             QGCLabel {
-                width: parent.width / 3
+                width: parent.width / windowWidthFactor
                 horizontalAlignment: Text.AlignHCenter
-                text: "Dist"
+                text: qsTr("Dist:")
             }
         }
 
@@ -78,43 +83,42 @@ Rectangle {
 
             // LAT VALUE
             QGCLabel {
-                width: parent.width / 3
+                width: parent.width / windowWidthFactor
                 horizontalAlignment: Text.AlignHCenter
                 verticalAlignment:   Text.AlignVCenter
-                text: fmt(
-                    control.vehicle && control.vehicle.specialLat
-                        ? control.vehicle.specialLat.rawValue
-                        : NaN,
-                    4
-                )
+                text: formatValue(
+                          instrumentRoot.vehicle && instrumentRoot.vehicle.specialLat
+                              ? instrumentRoot.vehicle.specialLat.rawValue
+                              : NaN,
+                          coordinatePrecision
+                      )
             }
 
             // LON VALUE
             QGCLabel {
-                width: parent.width / 3
+                width: parent.width / windowWidthFactor
                 horizontalAlignment: Text.AlignHCenter
                 verticalAlignment:   Text.AlignVCenter
-                text: fmt(
-                    control.vehicle && control.vehicle.specialLon
-                        ? control.vehicle.specialLon.rawValue
-                        : NaN,
-                    4
-                )
+                text: formatValue(
+                          instrumentRoot.vehicle && instrumentRoot.vehicle.specialLon
+                              ? instrumentRoot.vehicle.specialLon.rawValue
+                              : NaN,
+                          coordinatePrecision
+                      )
             }
 
-            // DIST VALUE (was specialData)
+            // DIST VALUE
             QGCLabel {
-                width: parent.width / 3
+                width: parent.width / windowWidthFactor
                 horizontalAlignment: Text.AlignHCenter
                 verticalAlignment:   Text.AlignVCenter
-                text: fmt(
-                    control.vehicle && control.vehicle.specialData
-                        ? control.vehicle.specialData.rawValue
-                        : NaN,
-                    1
-                )
+                text: formatValue(
+                          instrumentRoot.vehicle && instrumentRoot.vehicle.specialData
+                              ? instrumentRoot.vehicle.specialData.rawValue
+                              : NaN,
+                          1
+                      )
             }
         }
     }
-
 }
