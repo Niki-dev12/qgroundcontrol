@@ -20,21 +20,18 @@ docker run \
   -v "${BUILD_DIR}:/project/build" \
   "${IMAGE_NAME}"
 
-APPIMAGE_PATH=$(find "${BUILD_DIR}" -maxdepth 1 -name "*.AppImage" | head -n 1)
+APPIMAGE_PATH=$(ls -t "${BUILD_DIR}"/*.AppImage 2>/dev/null | head -n 1)
 
 if [ -z "$APPIMAGE_PATH" ]; then
     echo "ERROR: No AppImage found in ${BUILD_DIR}"
     exit 1
 fi
 
-#current git commit short hash
-GIT_HASH=$(git -C "${SOURCE_DIR}" rev-parse --short HEAD)
-
 DIR=$(dirname "$APPIMAGE_PATH")
-BASE=$(basename "$APPIMAGE_PATH" .AppImage)
-NEW_NAME="${BASE}-${GIT_HASH}.AppImage"
-
-mv "$APPIMAGE_PATH" "${DIR}/${NEW_NAME}"
+STRIBOG_BASE="av3_1_2"
+GIT_HASH=$(git -C "${SOURCE_DIR}" rev-parse --short=7 HEAD 2>/dev/null || echo "nogit")
+NEW_NAME="QGroundControl-${STRIBOG_BASE}-${GIT_HASH}.AppImage"
+mv -f "$APPIMAGE_PATH" "${DIR}/${NEW_NAME}"
 
 echo "✓ AppImage renamed to:"
 echo "   ${DIR}/${NEW_NAME}"
