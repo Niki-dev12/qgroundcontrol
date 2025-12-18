@@ -58,6 +58,9 @@ else()
             OUTPUT_STRIP_TRAILING_WHITESPACE
             ERROR_QUIET
         )
+        if(STRIBOG_COMMIT_SHORT STREQUAL "")
+            set(STRIBOG_COMMIT_SHORT "unknown")
+        endif()
     endif()
 endif()
 
