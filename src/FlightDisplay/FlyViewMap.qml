@@ -52,6 +52,20 @@ FlightMap {
     property bool   _keepVehicleCentered:       pipMode ? true : false
     property bool   _saveZoomLevelSetting:      true
 
+    // current selection
+    property int  selectedTagId: -1
+    property real selectedLat: NaN
+    property real selectedLon: NaN
+
+    signal tagClicked(int oid, real lat, real lon)
+
+    onTagClicked: (oid, lat, lon) => {
+        selectedTagId = oid
+        selectedLat   = lat
+        selectedLon   = lon
+        // optional: center map here too if you want centralized behavior
+    }
+
     function _adjustMapZoomForPipMode() {
         _saveZoomLevelSetting = false
         if (pipMode) {
@@ -374,6 +388,7 @@ FlightMap {
         }
     }
 
+    // Tagged items //dev
     MapItemView {
         model: _activeVehicle ? _activeVehicle.geopixelDetections : null
 
@@ -392,7 +407,9 @@ FlightMap {
                 property int cls: object ? object.classId  : -1
                 property int oid: object ? object.objectId : -1
 
-                property bool selected: false
+                readonly property bool isSelected: _activeVehicle
+                                 && _activeVehicle.selectedGeopixelObjectId === oid
+
 
                 width:  ScreenTools.defaultFontPixelHeight * 1.8
                 height: width
@@ -408,11 +425,11 @@ FlightMap {
                     anchors.fill: parent
                     radius: width / 2
 
-                    color: markerRoot.selected ? markerRoot.selectedColor : markerRoot.baseColor
+                    color: markerRoot.isSelected ? markerRoot.selectedColor : markerRoot.baseColor
 
                     antialiasing: true
-                    border.color: markerRoot.selected ? "black" : Qt.darker(markerRoot.baseColor, 1.4)
-                    border.width: markerRoot.selected ? 3 : 2
+                    border.color: markerRoot.isSelected ? "black" : Qt.darker(markerRoot.baseColor, 1.4)
+                    border.width: markerRoot.isSelected ? 3 : 2
 
                     gradient: Gradient {
                         GradientStop { position: 0.0; color: Qt.lighter(circle.color, 1.5) }
@@ -436,11 +453,13 @@ FlightMap {
                     cursorShape: Qt.PointingHandCursor
 
                     onClicked: {
-                        markerRoot.selected = !markerRoot.selected
+                        if (_activeVehicle) {
+                            _activeVehicle.selectedGeopixelObjectId =
+                                (_activeVehicle.selectedGeopixelObjectId === markerRoot.oid) ? -1 : markerRoot.oid
+                            console.log("[GeoMarker] selectedGeopixelObjectId =", _activeVehicle.selectedGeopixelObjectId)
+                        }
 
-                        console.log("[GeoMarker] clicked objectId =", markerRoot.oid)
-
-                        if (_root && object && object.coordinate.isValid) {
+                        if (_root && object && object.coordinate && object.coordinate.isValid) {
                             _root.center = object.coordinate
                         }
                     }

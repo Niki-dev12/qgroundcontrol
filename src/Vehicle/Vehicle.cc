@@ -4149,6 +4149,21 @@ void Vehicle::_handleCommandRequestOperatorControl(const mavlink_command_long_t 
     emit requestOperatorControlReceived(commandLong.param1, commandLong.param3, commandLong.param4);
 }
 
+//dev
+void Vehicle::setSelectedGeopixelObjectId(int id)
+{
+    if (_selectedGeopixelObjectId == id) {
+        return;
+    }
+    _selectedGeopixelObjectId = id;
+    emit selectedGeopixelObjectIdChanged();
+}
+
+QObject* Vehicle::geopixelDetectionById(int objectId) const
+{
+    return _geopixelDetectionsById.value(objectId, nullptr);
+}
+
 void Vehicle::_handleSpatialUser4(const mavlink_command_long_t& cmd)
 {
     const float param1 = cmd.param1;
@@ -4221,6 +4236,7 @@ void Vehicle::_handleSpatialUser4(const mavlink_command_long_t& cmd)
              << "distance:" << alt
              << "ts:" << ts;
 }
+//dev
 
 void Vehicle::_handleCommandLong(const mavlink_message_t& message)
 {
@@ -4247,6 +4263,7 @@ void Vehicle::getCurrentGstreamSize(float width, float height){
     gstreamWidth = width;
 }
 
+//dev
 void Vehicle::boundingBoxClick(float xClick, float yClick, float xDisplay, float yDisplay, float boxWidth, float boxHeight)
 {
     if (xDisplay <= 0.0f || yDisplay <= 0.0f || gstreamWidth <= 0.0f || gstreamHeight <= 0.0f) {

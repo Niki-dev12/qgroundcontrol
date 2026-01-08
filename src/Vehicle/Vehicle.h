@@ -287,6 +287,7 @@ public:
     Q_PROPERTY(QString  vehicleUIDStr               READ vehicleUIDStr              NOTIFY vehicleUIDChanged)
 
     Q_PROPERTY(bool     mavlinkSigning              READ mavlinkSigning             NOTIFY mavlinkSigningChanged)
+    Q_PROPERTY(int selectedGeopixelObjectId         READ selectedGeopixelObjectId   WRITE setSelectedGeopixelObjectId   NOTIFY selectedGeopixelObjectIdChanged) //dev
 
     /// Resets link status counters
     Q_INVOKABLE void resetCounters  ();
@@ -824,12 +825,18 @@ public:
 
     GimbalController* gimbalController  () { return _gimbalController; }
 
+    int selectedGeopixelObjectId() const { return _selectedGeopixelObjectId; } //dev
+    void setSelectedGeopixelObjectId(int id); //dev
+
+    Q_INVOKABLE QObject* geopixelDetectionById(int objectId) const; //dev
+
 public slots:
     void setVtolInFwdFlight                 (bool vtolInFwdFlight);
     void _offlineFirmwareTypeSettingChanged (QVariant varFirmwareType); // Should only be used by MissionControler to set firmware from Plan file
     void _offlineVehicleTypeSettingChanged  (QVariant varVehicleType);  // Should only be used by MissionController to set vehicle type from Plan file
 
 signals:
+    void selectedGeopixelObjectIdChanged(); //dev
     void user3DataChanged               (double lat, double lon, double special);
     void coordinateChanged              (QGeoCoordinate coordinate);
     void joystickEnabledChanged         (bool enabled);
@@ -956,6 +963,7 @@ private slots:
     void _altitudeAboveTerrainReceived      (bool sucess, QList<double> heights);
 
 private:
+    int _selectedGeopixelObjectId{-1}; //dev
     void _loadJoystickSettings          ();
     void _activeVehicleChanged          (Vehicle* newActiveVehicle);
     void _captureJoystick               ();

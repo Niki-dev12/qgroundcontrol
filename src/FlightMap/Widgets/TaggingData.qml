@@ -16,7 +16,7 @@ Rectangle {
     id: instrumentRoot
 
     implicitWidth:  ScreenTools.defaultFontPixelHeight * 12
-    implicitHeight: ScreenTools.defaultFontPixelHeight * 2.8
+    implicitHeight: ScreenTools.defaultFontPixelHeight * 4 //2.8
     width:          implicitWidth
     height:         implicitHeight
 
@@ -26,6 +26,9 @@ Rectangle {
     readonly property int  coordinatePrecision:     5
 
     property var vehicle: QGroundControl.multiVehicleManager.activeVehicle
+
+    property int selectedTagId: instrumentRoot.vehicle ? instrumentRoot.vehicle.selectedGeopixelObjectId : -1
+    property var selectedDet: instrumentRoot.vehicle ? instrumentRoot.vehicle.geopixelDetectionById(selectedTagId) : null
 
     QGCPalette {
         id: qgcPalette
@@ -48,9 +51,9 @@ Rectangle {
         anchors.margins: ScreenTools.defaultFontPixelWidth
         spacing: ScreenTools.defaultFontPixelHeight * 0.2
 
-        // -------------------------
-        // ROW 1: STATIC LABEL HEADERS
-        // -------------------------
+        // // -------------------------
+        // // ROW 1: STATIC LABEL HEADERS
+        // // -------------------------
         Row {
             width: parent.width
             spacing: ScreenTools.defaultFontPixelWidth
@@ -120,5 +123,59 @@ Rectangle {
                       )
             }
         }
+
+        // -------------------------
+        // ROW 3: TRACKED SELECTED TAG (auto-updates)
+        // -------------------------
+        Row {
+            width: parent.width
+            spacing: ScreenTools.defaultFontPixelWidth
+
+            QGCLabel {
+                width: parent.width / windowWidthFactor
+                horizontalAlignment: Text.AlignHCenter
+                verticalAlignment:   Text.AlignVCenter
+                text: formatValue(
+                        instrumentRoot.selectedDet
+                        && instrumentRoot.selectedDet.coordinate
+                        && instrumentRoot.selectedDet.coordinate.isValid
+                            ? instrumentRoot.selectedDet.coordinate.latitude
+                            : NaN,
+                        coordinatePrecision
+                    )
+            }
+
+            QGCLabel {
+                width: parent.width / windowWidthFactor
+                horizontalAlignment: Text.AlignHCenter
+                verticalAlignment:   Text.AlignVCenter
+                text: formatValue(
+                        instrumentRoot.selectedDet
+                        && instrumentRoot.selectedDet.coordinate
+                        && instrumentRoot.selectedDet.coordinate.isValid
+                            ? instrumentRoot.selectedDet.coordinate.longitude
+                            : NaN,
+                        coordinatePrecision
+                    )
+            }
+
+            QGCLabel {
+                width: parent.width / windowWidthFactor
+                horizontalAlignment: Text.AlignHCenter
+                verticalAlignment:   Text.AlignVCenter
+                text: formatValue(
+                        instrumentRoot.selectedDet ? instrumentRoot.selectedDet.altitude : NaN,
+                        1
+                    )
+            }
+        }
     }
+
+    onSelectedTagIdChanged: {
+        console.log("[TaggingData] selectedTagId =", selectedTagId)
+    }
+    onSelectedDetChanged: {
+        console.log("[TaggingData] selectedDet =", selectedDet)
+    }
+
 }
