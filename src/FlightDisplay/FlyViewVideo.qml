@@ -20,6 +20,8 @@ Item {
     property Item pipView
     property Item pipState: videoPipState
 
+    property var _activeVehicle: QGroundControl.multiVehicleManager.activeVehicle
+
     property int    _track_rec_x:       0
     property int    _track_rec_y:       0
 
@@ -151,6 +153,17 @@ Item {
         }
         onReleased: (mouse) => {
             onScreenGimbalController.releaseControl()
+            if (_activeVehicle) {
+                _activeVehicle.boundingBoxClick(
+                    mouse.x,
+                    mouse.y,
+                    videoStreaming.width,
+                    videoStreaming.height,
+                    0,
+                    0
+                )
+            }
+
             
             //if there is already a selection, delete it
             if (trackingROI !== null) {

@@ -22,6 +22,8 @@
 
 #include "VideoReceiver.h"
 
+#include "Vehicle.h" //dev
+
 Q_DECLARE_LOGGING_CATEGORY(GstVideoReceiverLog)
 
 typedef std::function<void()> Task;
@@ -59,6 +61,7 @@ class GstVideoReceiver : public VideoReceiver
 public:
     explicit GstVideoReceiver(QObject *parent = nullptr);
     ~GstVideoReceiver();
+    void setVehicle(Vehicle* vehicle); //dev
 
 public slots:
     void start(uint32_t timeout) override;
@@ -74,6 +77,8 @@ private slots:
     void _handleEOS();
 
 private:
+    Vehicle* _vehicle = nullptr; //dev
+
     GstElement *_makeSource(const QString &input);
     GstElement *_makeDecoder(GstCaps *caps = nullptr, GstElement *videoSink = nullptr);
     GstElement *_makeFileSink(const QString &videoFile, FILE_FORMAT format);

@@ -52,6 +52,24 @@ FlightMap {
     property bool   _keepVehicleCentered:       pipMode ? true : false
     property bool   _saveZoomLevelSetting:      true
 
+    // current selection
+    property int  selectedTagId: -1
+    property real selectedLat: NaN
+    property real selectedLon: NaN
+
+    signal tagClicked(int oid, real lat, real lon)
+
+    onTagClicked: (oid, lat, lon) => {
+        selectedTagId = oid
+        selectedLat   = lat
+        selectedLon   = lon
+
+        if (_activeVehicle) {
+            _activeVehicle.selectedGeopixelObjectId =
+                (_activeVehicle.selectedGeopixelObjectId === oid) ? -1 : oid
+        }
+    }
+
     function _adjustMapZoomForPipMode() {
         _saveZoomLevelSetting = false
         if (pipMode) {
@@ -371,6 +389,114 @@ FlightMap {
         delegate: CameraTriggerIndicator {
             coordinate:     object.coordinate
             z:              QGroundControl.zOrderTopMost
+        }
+    }
+
+    // Tagged items
+    MapItemView {
+        id: taggedItemsView
+        model: _activeVehicle ? _activeVehicle.geopixelDetections : null
+
+        // Local debug switch
+        property bool _debugGeoMarkers: false
+
+        delegate: MapQuickItem {
+            id: detectionItem
+
+            // Keep consistent with items layering.
+            z: QGroundControl.zOrderMapItems
+
+            // Guard invalid data
+            readonly property bool _hasValidCoord: object && object.coordinate && object.coordinate.isValid
+            visible: _hasValidCoord
+            coordinate: _hasValidCoord ? object.coordinate : QtPositioning.coordinate()
+
+            anchorPoint.x: sourceItem.width  / 2
+            anchorPoint.y: sourceItem.height / 2
+
+            sourceItem: Item {
+                id: markerRoot
+
+                readonly property int cls: object ? object.classId  : -1
+                readonly property int oid: object ? object.objectId : -1
+
+                readonly property bool isSelected: _activeVehicle
+                                                 && _activeVehicle.selectedGeopixelObjectId === oid
+
+                // Tunables
+                readonly property real markerSize: ScreenTools.defaultFontPixelHeight * 1.8
+                readonly property real labelScale: 0.35
+                readonly property int  borderWidthNormal: 2
+                readonly property int  borderWidthSelected: 3
+
+                width:  markerSize
+                height: markerSize
+
+                readonly property color _borderColor: mapPal ? mapPal.text : "black"
+                readonly property color _textColor:   mapPal ? mapPal.text : "black"
+
+                readonly property color baseColor: (cls === 1) ? "#ff4040"
+                                               : (cls === 2) ? "#40c040"
+                                                           : "#f0d040"
+
+                readonly property color selectedColor: Qt.lighter(baseColor, 1.8)
+                readonly property color fillColor:     isSelected ? selectedColor : baseColor
+
+                Rectangle {
+                    id: circle
+                    anchors.fill: parent
+                    radius: width / 2
+
+                    color: markerRoot.fillColor
+
+                    border.color: markerRoot.isSelected
+                                  ? markerRoot._borderColor
+                                  : Qt.darker(markerRoot.baseColor, 1.4)
+
+                    border.width: markerRoot.isSelected
+                                  ? markerRoot.borderWidthSelected
+                                  : markerRoot.borderWidthNormal
+                }
+
+                QGCLabel {
+                    anchors.centerIn: parent
+                    text: markerRoot.oid >= 0 ? String(markerRoot.oid) : "?"
+                    font.bold: true
+                    font.pixelSize: parent.height * markerRoot.labelScale
+                    color: markerRoot._textColor
+                }
+
+                MouseArea {
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+
+                    onClicked: {
+                        if (!detectionItem._hasValidCoord || markerRoot.oid < 0) {
+                            return
+                        }
+
+                        _root.tagClicked(
+                            markerRoot.oid,
+                            object.coordinate.latitude,
+                            object.coordinate.longitude
+                        )
+
+                        // center map
+                        _root.center = object.coordinate
+
+                        if (taggedItemsView._debugGeoMarkers) {
+                            console.log("[GeoMarker] clicked oid =", markerRoot.oid)
+                        }
+                    }
+                }
+
+                Component.onCompleted: {
+                    if (taggedItemsView._debugGeoMarkers) {
+                        console.log("[GeoMarker] created oid =", markerRoot.oid, "cls =", markerRoot.cls)
+                    }
+                }
+            }
         }
     }
 

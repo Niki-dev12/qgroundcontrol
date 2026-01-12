@@ -75,6 +75,7 @@ class TrajectoryPoints;
 class VehicleBatteryFactGroup;
 class VehicleObjectAvoidance;
 class GimbalController;
+class GeopixelDetection;
 #ifdef QGC_UTM_ADAPTER
 class UTMSPVehicle;
 #endif
@@ -286,6 +287,7 @@ public:
     Q_PROPERTY(QString  vehicleUIDStr               READ vehicleUIDStr              NOTIFY vehicleUIDChanged)
 
     Q_PROPERTY(bool     mavlinkSigning              READ mavlinkSigning             NOTIFY mavlinkSigningChanged)
+    Q_PROPERTY(int selectedGeopixelObjectId         READ selectedGeopixelObjectId   WRITE setSelectedGeopixelObjectId   NOTIFY selectedGeopixelObjectIdChanged) //dev
 
     /// Resets link status counters
     Q_INVOKABLE void resetCounters  ();
@@ -414,6 +416,10 @@ public:
     Q_INVOKABLE void saveJoystickSettings(void);
 
     Q_INVOKABLE void sendSetupSigning();
+
+    Q_INVOKABLE void boundingBoxClick(float xClick, float yClick, float xDisplay, float yDisplay, float boxWidth, float boxHeight);
+
+    void getCurrentGstreamSize(float width, float height);
 
     bool    isInitialConnectComplete() const;
     bool    guidedModeSupported     () const;
@@ -819,12 +825,18 @@ public:
 
     GimbalController* gimbalController  () { return _gimbalController; }
 
+    int selectedGeopixelObjectId() const { return _selectedGeopixelObjectId; } //dev
+    void setSelectedGeopixelObjectId(int id); //dev
+
+    Q_INVOKABLE QObject* geopixelDetectionById(int objectId) const; //dev
+
 public slots:
     void setVtolInFwdFlight                 (bool vtolInFwdFlight);
     void _offlineFirmwareTypeSettingChanged (QVariant varFirmwareType); // Should only be used by MissionControler to set firmware from Plan file
     void _offlineVehicleTypeSettingChanged  (QVariant varVehicleType);  // Should only be used by MissionController to set vehicle type from Plan file
 
 signals:
+    void selectedGeopixelObjectIdChanged(); //dev
     void user3DataChanged               (double lat, double lon, double special);
     void coordinateChanged              (QGeoCoordinate coordinate);
     void joystickEnabledChanged         (bool enabled);
@@ -951,6 +963,7 @@ private slots:
     void _altitudeAboveTerrainReceived      (bool sucess, QList<double> heights);
 
 private:
+    int _selectedGeopixelObjectId{-1}; //dev
     void _loadJoystickSettings          ();
     void _activeVehicleChanged          (Vehicle* newActiveVehicle);
     void _captureJoystick               ();
@@ -979,7 +992,8 @@ private:
 #endif
     void _handleCameraImageCaptured     (const mavlink_message_t& message);
     void _handleCommandLong             (const mavlink_message_t& message);
-    void _handleSpatialUser3            (const mavlink_command_long_t& cmd);
+    void _handleSpatialUser4            (const mavlink_command_long_t& cmd);
+    QString _latLonToMgrs               (double latitudeDeg, double longitudeDeg, int meterPrecision);
     void _missionManagerError           (int errorCode, const QString& errorMsg);
     void _geoFenceManagerError          (int errorCode, const QString& errorMsg);
     void _rallyPointManagerError        (int errorCode, const QString& errorMsg);
@@ -1346,6 +1360,7 @@ private:
     Q_PROPERTY(int     operatorControlTakeoverTimeoutMsecs   READ operatorControlTakeoverTimeoutMsecs   CONSTANT)
     Q_PROPERTY(int     requestOperatorControlRemainingMsecs  READ requestOperatorControlRemainingMsecs  CONSTANT)
     Q_PROPERTY(bool    sendControlRequestAllowed             READ sendControlRequestAllowed             NOTIFY sendControlRequestAllowedChanged)
+    Q_PROPERTY(QmlObjectListModel* geopixelDetections READ geopixelDetections CONSTANT)
 
     uint8_t sysidInControl() const { return _sysid_in_control; }
     bool    gcsControlStatusFlags_SystemManager() const { return _gcsControlStatusFlags_SystemManager; }
@@ -1396,6 +1411,8 @@ public:
     QString formattedMessages() const;
 
     // StatusTextHandler* statusTextHandler() { return m_statusTextHandler; }
+
+    QmlObjectListModel* geopixelDetections() { return &_geopixelDetections; }
 
 signals:
     void textMessageReceived(int sysid, int componentid, int severity, QString text, QString description);
@@ -1452,6 +1469,9 @@ private:
     void _createMAVLinkLogManager();
 
     MAVLinkLogManager *_mavlinkLogManager = nullptr;
+
+    QmlObjectListModel          _geopixelDetections { this };
+    QHash<int, GeopixelDetection*> _geopixelDetectionsById;
 
 /*---------------------------------------------------------------------------*/
 };

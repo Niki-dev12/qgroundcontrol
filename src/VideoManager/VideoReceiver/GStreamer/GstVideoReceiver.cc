@@ -1028,6 +1028,12 @@ bool GstVideoReceiver::_addVideoSink(GstPad *pad)
             (void) gst_structure_get_int(structure, "width", &width);
             (void) gst_structure_get_int(structure, "height", &height);
             _dispatchSignal([this, width, height]() { emit videoSizeChanged(QSize(width, height)); });
+
+            //dev
+            float widthF = static_cast<float>(width);
+            float heightF = static_cast<float>(height);
+            _vehicle->getCurrentGstreamSize(widthF, heightF);
+            //dev end
         }
     } else {
         _dispatchSignal([this]() { emit videoSizeChanged(QSize()); });
@@ -1461,4 +1467,9 @@ void GstVideoWorker::run()
 
         task();
     }
+}
+
+//dev
+void GstVideoReceiver::setVehicle(Vehicle* vehicle) {
+    _vehicle = vehicle;
 }

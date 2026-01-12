@@ -59,6 +59,8 @@
 #include "MavlinkSettings.h"
 #include "APM.h"
 
+#include "GeopixelDetection.h"
+
 #ifdef QGC_UTM_ADAPTER
 #include "UTMSPVehicle.h"
 #include "UTMSPManager.h"
@@ -76,6 +78,15 @@ QGC_LOGGING_CATEGORY(VehicleLog, "VehicleLog")
 #define DEFAULT_LON -120.083923f
 #define SET_HOME_TERRAIN_ALT_MAX 10000
 #define SET_HOME_TERRAIN_ALT_MIN -500
+
+//dev
+#define FPV_CONTROL 191
+#define COMPONENT_ID_USER 25  // av-tagging
+#define COMPONENT_CAM_ID 100  // av-fpv-vision
+float gstreamWidth;
+float gstreamHeight;
+//dev end
+
 
 // After a second GCS has requested control and we have given it permission to takeover, we will remove takeover permission automatically after this timeout
 // If the second GCS didn't get control 
@@ -118,6 +129,7 @@ Vehicle::Vehicle(LinkInterface*             link,
     , _rpmFactGroup                 (this)
     , _terrainFactGroup             (this)
     , _terrainProtocolHandler       (new TerrainProtocolHandler(this, &_terrainFactGroup, this))
+    , _geopixelDetections           (this)
 {
     connect(JoystickManager::instance(), &JoystickManager::activeJoystickChanged, this, &Vehicle::_loadJoystickSettings);
     connect(MultiVehicleManager::instance(), &MultiVehicleManager::activeVehicleChanged, this, &Vehicle::_activeVehicleChanged);
@@ -463,7 +475,7 @@ void Vehicle::_mavlinkMessageReceived(LinkInterface* link, mavlink_message_t mes
         qCDebug(VehicleLog) << "_mavlinkMessageReceived Link already running Mavlink v2. Setting _maxProtoVersion" << _maxProtoVersion;
     }
 
-    if (message.sysid != _id && message.sysid != 0) {
+    if (message.sysid != _id && message.sysid != 0 && message.sysid != 42) {
         // We allow RADIO_STATUS messages which come from a link the vehicle is using to pass through and be handled
         if (!(message.msgid == MAVLINK_MSG_ID_RADIO_STATUS && _vehicleLinkManager->containsLink(link))) {
             return;
@@ -4137,27 +4149,97 @@ void Vehicle::_handleCommandRequestOperatorControl(const mavlink_command_long_t 
     emit requestOperatorControlReceived(commandLong.param1, commandLong.param3, commandLong.param4);
 }
 
-void Vehicle::_handleSpatialUser3(const mavlink_command_long_t& cmd)
+//dev
+void Vehicle::setSelectedGeopixelObjectId(int id)
 {
-    qDebug() << "User 3";
+    if (_selectedGeopixelObjectId == id) {
+        return;
+    }
+    _selectedGeopixelObjectId = id;
+    emit selectedGeopixelObjectIdChanged();
+}
 
-    const double lat     = static_cast<double>(cmd.param1);
-    const double lon     = static_cast<double>(cmd.param2);
-    const double special = static_cast<double>(cmd.param3);
+QObject* Vehicle::geopixelDetectionById(int objectId) const
+{
+    return _geopixelDetectionsById.value(objectId, nullptr);
+}
 
-    // write into the base VehicleFactGroup (same as heading)
+void Vehicle::_handleSpatialUser4(const mavlink_command_long_t& cmd)
+{
+    const float param1 = cmd.param1;
+    const float param2 = cmd.param2;
+    const float param3 = cmd.param3;
+    const float param4 = cmd.param4;
+    const float param5 = cmd.param5;
+    const float param6 = cmd.param6;
+    const float param7 = cmd.param7;
+
+    static_assert(sizeof(float) == sizeof(quint32), "float must be 32 bits");
+
+    quint32 rawLat  = 0;
+    quint32 rawLon  = 0;
+    quint32 rawAlt  = 0;
+    quint32 rawClass = 0;
+    quint32 rawObj   = 0;
+    quint32 rawTsLo  = 0;
+    quint32 rawTsHi  = 0;
+
+    std::memcpy(&rawLat,  &param1, sizeof(rawLat));
+    std::memcpy(&rawLon,  &param2, sizeof(rawLon));
+    std::memcpy(&rawAlt,  &param3, sizeof(rawAlt));
+    std::memcpy(&rawClass,&param4, sizeof(rawClass));
+    std::memcpy(&rawObj,  &param5, sizeof(rawObj));
+    std::memcpy(&rawTsLo, &param6, sizeof(rawTsLo));
+    std::memcpy(&rawTsHi, &param7, sizeof(rawTsHi));
+
+    qint32 latE7 = 0;
+    qint32 lonE7 = 0;
+    std::memcpy(&latE7, &rawLat, sizeof(latE7));
+    std::memcpy(&lonE7, &rawLon, sizeof(lonE7));
+
+    float alt = 0.f;
+    std::memcpy(&alt, &rawAlt, sizeof(alt));
+
+    const double lat = static_cast<double>(latE7) / 1e7;
+    const double lon = static_cast<double>(lonE7) / 1e7;
+
+    const int     classId  = static_cast<int>(rawClass & 0xFF);
+    const int     objectId = static_cast<int>(rawObj   & 0xFFFF);
+    const quint64 ts       = (static_cast<quint64>(rawTsHi) << 32) | rawTsLo;
+
     specialLat()->setRawValue(lat);
     specialLon()->setRawValue(lon);
-    specialData()->setRawValue(special);
+    specialData()->setRawValue(static_cast<double>(alt));
 
-    qDebug() << "Lat:"     << lat;
-    qDebug() << "Lon:"     << lon;
-    qDebug() << "Special:" << special;
+    GeopixelDetection* det = _geopixelDetectionsById.value(objectId, nullptr);
+
+    if (!det) {
+        det = new GeopixelDetection(this);
+        det->setObjectId(objectId);
+        det->setClassId(classId);
+
+        _geopixelDetectionsById.insert(objectId, det);
+        _geopixelDetections.append(det);
+    } else {
+        det->setClassId(classId);
+    }
+
+    QGeoCoordinate coord(lat, lon, alt);
+    det->setCoordinate(coord);
+    det->setAltitude(alt);
+    det->setTimestamp(ts);
+
+    qDebug() << "[SpatialUser4] objId:" << objectId
+             << "classId:" << classId
+             << "lat:" << lat
+             << "lon:" << lon
+             << "distance:" << alt
+             << "ts:" << ts;
 }
+//dev
 
 void Vehicle::_handleCommandLong(const mavlink_message_t& message)
 {
-    qDebug()<<"Command long";
     mavlink_command_long_t commandLong;
     mavlink_msg_command_long_decode(&message, &commandLong);
     // Ignore command if it is not targeted for us
@@ -4166,7 +4248,7 @@ void Vehicle::_handleCommandLong(const mavlink_message_t& message)
     }
     // Handle 31008
     if (commandLong.command == MAV_CMD_SPATIAL_USER_4) {
-        _handleSpatialUser3(commandLong);
+        _handleSpatialUser4(commandLong);
         return;
     }
 
@@ -4174,6 +4256,51 @@ void Vehicle::_handleCommandLong(const mavlink_message_t& message)
         _handleCommandRequestOperatorControl(commandLong);
     }
 }
+
+// Developed
+void Vehicle::getCurrentGstreamSize(float width, float height){
+    gstreamHeight = height;
+    gstreamWidth = width;
+}
+
+//dev
+void Vehicle::boundingBoxClick(float xClick, float yClick, float xDisplay, float yDisplay, float boxWidth, float boxHeight)
+{
+    if (xDisplay <= 0.0f || yDisplay <= 0.0f || gstreamWidth <= 0.0f || gstreamHeight <= 0.0f) {
+        return;
+    }
+    const float streamAspect = gstreamWidth / gstreamHeight;
+    const float displayAspect = xDisplay / yDisplay;
+
+    float scale = std::min(xDisplay / gstreamWidth, yDisplay / gstreamHeight);
+    float renderWidth = gstreamWidth * scale;
+    float renderHeight = gstreamHeight * scale;
+    float offsetX = (xDisplay - renderWidth) / 2.0f;
+    float offsetY = (yDisplay - renderHeight) / 2.0f;
+
+    xClick = (xClick - offsetX) / renderWidth;
+    yClick = (yClick - offsetY) / renderHeight;
+
+    if (boxWidth > 0.0f && boxHeight > 0.0f) {
+        boxWidth /= renderWidth;
+        boxHeight /= renderHeight;
+    }
+    
+    sendMavCommand(
+        COMPONENT_CAM_ID, MAV_CMD_SPATIAL_USER_3, false,
+        xClick, yClick, boxWidth, boxHeight, -1, 0, 0
+    ); 
+
+    qDebug() << "MAV_CMD_SPATIAL_USER_3:"
+         << "xClick ="     << xClick
+         << "yClick ="     << yClick
+         << "boxWidth ="   << boxWidth
+         << "boxHeight ="  << boxHeight
+         << "param5 ="     << -1
+         << "param6 ="     << 0
+         << "param7 ="     << 0;
+}
+//dev end
 
 int Vehicle::operatorControlTakeoverTimeoutMsecs() const
 {
