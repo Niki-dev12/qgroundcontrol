@@ -45,6 +45,7 @@ public:
     Q_PROPERTY(QStringList              cameraLabels            READ cameraLabels                                   NOTIFY cameraLabelsChanged)
     Q_PROPERTY(MavlinkCameraControl*    currentCameraInstance   READ currentCameraInstance                          NOTIFY currentCameraChanged)
     Q_PROPERTY(int                      currentCamera           READ currentCamera      WRITE  setCurrentCamera     NOTIFY currentCameraChanged)
+    Q_PROPERTY(int currentZoomLevel READ currentZoomLevel NOTIFY currentZoomLevelChanged)
 
     virtual QmlObjectListModel*     cameras             ()          { return &_cameras; }       ///< List of cameras provided by current vehicle
     virtual QStringList             cameraLabels        ()          { return _cameraLabels; }   ///< Camera names to show the user (for selection)
@@ -72,11 +73,23 @@ public:
         QTimer*     backoffTimer    = nullptr;
     };
 
+    int currentZoomLevel() const;
+    double aspectForComp(int compId) const;
+    double currentCameraAspect();
+    Q_INVOKABLE void requestCameraFovForComp(int compId);
+
+private:
+    int _zoomValueCurrent = 0;
+
 signals:
     void    camerasChanged          ();
     void    cameraLabelsChanged     ();
     void    currentCameraChanged    ();
     void    streamChanged           ();
+    void currentZoomLevelChanged();
+
+private slots:
+    void _setCurrentZoomLevel(int level);
 
 protected slots:
     virtual void    _vehicleReady           (bool ready);
@@ -108,6 +121,7 @@ protected:
     virtual void    _handleBatteryStatus    (const mavlink_message_t& message);
     virtual void    _handleTrackingImageStatus(const mavlink_message_t& message);
     virtual void    _addCameraControlToLists(MavlinkCameraControl* cameraControl);
+    virtual void    _handleCameraFovStatus(const mavlink_message_t& message);
 
     static QList<CameraMetaData*> _parseCameraMetaData(const QString &jsonFilePath);
 
@@ -124,4 +138,6 @@ protected:
     QMap<QString, CameraStruct*> _cameraInfoRequest;
     SimulatedCameraControl* _simulatedCameraControl = nullptr;
     static QVariantList _cameraList; ///< Standard QGC camera list
+
+    QHash<int, double> _aspectByCompId;
 };

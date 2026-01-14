@@ -64,6 +64,10 @@ private slots:
     void _rateSenderTimeout();
 
 private:
+    float _adaptiveDragSpeedDegS() const;
+    float _adaptiveOnscreenSpeedDegS() const;
+
+private:
     struct GimbalPairId {
         GimbalPairId() = default;
         GimbalPairId(uint8_t _managerCompid, uint8_t _deviceId)

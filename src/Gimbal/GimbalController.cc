@@ -16,6 +16,14 @@
 #include "SettingsManager.h"
 #include "Vehicle.h"
 
+#include <cmath>
+#include "Gimbal.h"
+#include "QGCCameraManager.h"
+#include <algorithm>
+#include <QDateTime>
+#include <QDebug>
+
+
 QGC_LOGGING_CATEGORY(GimbalControllerLog, "qgc.gimbal.gimbalcontroller")
 
 GimbalController::GimbalController(Vehicle *vehicle)
@@ -429,6 +437,69 @@ void GimbalController::centerGimbal()
     sendPitchBodyYaw(0.0, 0.0);
 }
 
+float GimbalController::_adaptiveOnscreenSpeedDegS() const
+{
+    const auto settings = SettingsManager::instance()->gimbalControllerSettings();
+    const float zoomMaxSpeed = settings->zoomMaxSpeed()->rawValue().toFloat();
+    const float zoomMinSpeed = settings->zoomMinSpeed()->rawValue().toFloat();
+
+    // Fallback if settings are not sane
+    if (zoomMaxSpeed <= 0.f || zoomMinSpeed <= 0.f) {
+        return zoomMaxSpeed > 0.f ? zoomMaxSpeed : 1.f;
+    }
+
+    float zoom = 0.f;
+    float zoomMin = 0.f;
+    float zoomMax = 1.f;
+    bool haveZoom = false;
+
+    if (_vehicle && _vehicle->cameraManager()) {
+        QObject* cam = _vehicle->cameraManager()->property("currentCameraInstance").value<QObject*>();
+        if (!cam) cam = _vehicle->cameraManager()->property("currentCamera").value<QObject*>();
+        if (!cam) cam = _vehicle->cameraManager()->property("activeCamera").value<QObject*>();
+
+        if (cam) {
+            auto readF = [&](const char* name, float& out) -> bool {
+                const QVariant v = cam->property(name);
+                if (!v.isValid()) return false;
+                bool ok = false;
+                const float f = v.toFloat(&ok);
+                if (!ok) return false;
+                out = f;
+                return true;
+            };
+
+            haveZoom = readF("zoomLevel", zoom) || readF("zoom", zoom) || readF("zoomValue", zoom);
+
+            bool okMin = readF("zoomMin", zoomMin) || readF("minZoom", zoomMin);
+            bool okMax = readF("zoomMax", zoomMax) || readF("maxZoom", zoomMax);
+
+            if (haveZoom && (!okMin || !okMax || zoomMax <= zoomMin)) {
+                if (zoom > 1.01f) {
+                    zoomMin = 0.f;
+                    zoomMax = 100.f;
+                } else {
+                    zoomMin = 0.f;
+                    zoomMax = 1.f;
+                }
+            }
+        }
+    }
+
+    if (!haveZoom || zoomMax <= zoomMin) {
+        return zoomMaxSpeed;
+    }
+
+    const float t = std::clamp((zoom - zoomMin) / (zoomMax - zoomMin), 0.f, 1.f);
+    return zoomMaxSpeed + t * (zoomMinSpeed - zoomMaxSpeed);
+    // return zoomMinSpeed + t * (zoomMaxSpeed - zoomMinSpeed);
+}
+
+float GimbalController::_adaptiveDragSpeedDegS() const
+{
+    return SettingsManager::instance()->gimbalControllerSettings()->CameraSlideSpeed()->rawValue().toFloat();
+}
+
 void GimbalController::gimbalOnScreenControl(float panPct, float tiltPct, bool clickAndPoint, bool clickAndDrag, bool rateControl, bool retract, bool neutral, bool yawlock)
 {
     // Pan and tilt comes as +-(0-1)
@@ -438,22 +509,168 @@ void GimbalController::gimbalOnScreenControl(float panPct, float tiltPct, bool c
         return;
     }
 
-    if (clickAndPoint) { // based on FOV
-        const float hFov = SettingsManager::instance()->gimbalControllerSettings()->CameraHFov()->rawValue().toFloat();
-        const float vFov = SettingsManager::instance()->gimbalControllerSettings()->CameraVFov()->rawValue().toFloat();
+    if (clickAndPoint) {
+    const auto settings = SettingsManager::instance()->gimbalControllerSettings();
 
-        const float panIncDesired = panPct * hFov * 0.5f;
-        const float tiltIncDesired = tiltPct * vFov * 0.5f;
+    // 1) Base FOV from settings (degrees)
+    float hFov = settings->CameraHFov()->rawValue().toFloat();
+    float vFov = settings->CameraVFov()->rawValue().toFloat();
 
-        const float panDesired = panIncDesired + _activeGimbal->bodyYaw()->rawValue().toFloat();
-        const float tiltDesired = tiltIncDesired + _activeGimbal->absolutePitch()->rawValue().toFloat();
+    // 2) Try to read CURRENT FOV from camera (recommended)
+    if (_vehicle && _vehicle->cameraManager()) {
+        QObject* cam = _vehicle->cameraManager()->property("currentCameraInstance").value<QObject*>();
+        if (!cam) cam = _vehicle->cameraManager()->property("currentCamera").value<QObject*>();
+        if (!cam) cam = _vehicle->cameraManager()->property("activeCamera").value<QObject*>();
 
-        if (_activeGimbal->yawLock()) {
-            sendPitchAbsoluteYaw(tiltDesired, panDesired + _vehicle->heading()->rawValue().toFloat(), false);
-        } else {
-            sendPitchBodyYaw(tiltDesired, panDesired, false);
+        auto readF = [&](const char* name, float& out) -> bool {
+            if (!cam) return false;
+            const QVariant v = cam->property(name);
+            if (!v.isValid()) return false;
+            bool ok = false;
+            const float f = v.toFloat(&ok);
+            if (!ok) return false;
+            out = f;
+            return true;
+        };
+
+        float tmp;
+        if (readF("horizontalFov", tmp) || readF("hfov", tmp) || readF("currentHFov", tmp)) {
+            if (tmp > 1.f && tmp < 179.f) hFov = tmp;
         }
-    } else if (clickAndDrag) { // based on maximum speed
+        if (readF("verticalFov", tmp) || readF("vfov", tmp) || readF("currentVFov", tmp)) {
+            if (tmp > 1.f && tmp < 179.f) vFov = tmp;
+        }
+    }
+
+    auto wrap180 = [](float deg) {
+        while (deg > 180.f) deg -= 360.f;
+        while (deg < -180.f) deg += 360.f;
+        return deg;
+    };
+
+    auto deg2rad = [](float d){ return d * float(M_PI) / 180.f; };
+    auto rad2deg = [](float r){ return r * 180.f / float(M_PI); };
+
+    // 3) Convert cursor pct -> angular offset using FOV geometry (NOT speed)
+    const float panIncDesired  = rad2deg(std::atan(panPct  * std::tan(deg2rad(hFov * 0.5f))));
+    const float tiltIncDesired = rad2deg(std::atan(tiltPct * std::tan(deg2rad(vFov * 0.5f))));
+
+    const float pitchNow    = _activeGimbal->absolutePitch()->rawValue().toFloat();
+    const float tiltDesired = pitchNow + tiltIncDesired;
+
+    const float bodyYawNow = _activeGimbal->bodyYaw()->rawValue().toFloat();
+    const float absYawNow  = _activeGimbal->absoluteYaw()->rawValue().toFloat();
+
+    if (_activeGimbal->yawLock()) {
+        const float yawAbsDesired = wrap180(absYawNow + panIncDesired);
+        sendPitchAbsoluteYaw(tiltDesired, yawAbsDesired, false);
+    } else {
+        // IMPORTANT: body yaw should also be [-180..180]
+        const float yawBodyDesired = wrap180(bodyYawNow + panIncDesired);
+        sendPitchBodyYaw(tiltDesired, yawBodyDesired, false);
+    }
+
+    return;
+
+    // if (clickAndPoint) {
+    // const auto settings = SettingsManager::instance()->gimbalControllerSettings();
+    // const float hFov = settings->CameraHFov()->rawValue().toFloat();
+    // const float vFov = settings->CameraVFov()->rawValue().toFloat();
+
+    // const float zoomMaxSpeed = settings->zoomMaxSpeed()->rawValue().toFloat();
+    // const float speedNow     = _adaptiveOnscreenSpeedDegS();
+
+    // float stepScale = (zoomMaxSpeed > 0.f) ? (speedNow / zoomMaxSpeed) : 1.f;
+    // stepScale = std::clamp(stepScale, 0.05f, 5.0f);
+
+    // const float panIncDesired  = panPct  * hFov * 0.5f * stepScale;
+    // const float tiltIncDesired = tiltPct * vFov * 0.5f * stepScale;
+
+    // auto wrap180 = [](float deg) {
+    //     while (deg > 180.f) deg -= 360.f;
+    //     while (deg < -180.f) deg += 360.f;
+    //     return deg;
+    // };
+    // auto wrap360 = [](float deg) {
+    //     while (deg >= 360.f) deg -= 360.f;
+    //     while (deg < 0.f)    deg += 360.f;
+    //     return deg;
+    // };
+
+    // const float pitchNow    = _activeGimbal->absolutePitch()->rawValue().toFloat();
+    // const float tiltDesired = pitchNow + tiltIncDesired;
+
+    // const float bodyYawNow = _activeGimbal->bodyYaw()->rawValue().toFloat();
+    // const float absYawNow  = _activeGimbal->absoluteYaw()->rawValue().toFloat();
+
+    // if (_activeGimbal->yawLock()) {
+    //     const float yawAbsDesired = wrap180(absYawNow + panIncDesired);
+    //     sendPitchAbsoluteYaw(tiltDesired, yawAbsDesired, false);
+    // } else {
+    //     const float yawBodyDesired = wrap360(bodyYawNow + panIncDesired);
+    //     sendPitchBodyYaw(tiltDesired, yawBodyDesired, false);
+    // }
+
+    // -------------------------------------------------------
+
+    // if (clickAndPoint) {
+    //     const auto settings = SettingsManager::instance()->gimbalControllerSettings();
+    //     const float hFov = settings->CameraHFov()->rawValue().toFloat();
+    //     const float vFov = settings->CameraVFov()->rawValue().toFloat();
+
+    //     const float zoomMaxSpeed = settings->zoomMaxSpeed()->rawValue().toFloat();
+    //     const float speedNow     = _adaptiveOnscreenSpeedDegS();
+        
+    //     float stepScale          = (zoomMaxSpeed > 0.f) ? (speedNow / zoomMaxSpeed) : 1.f;
+    //     stepScale                = std::clamp(stepScale, 0.05f, 5.0f);
+
+    //     const float panIncDesired  = panPct  * hFov * 0.5f * stepScale;
+    //     const float tiltIncDesired = tiltPct * vFov * 0.5f * stepScale;
+
+    //     const float pitchNow  = _activeGimbal->absolutePitch()->rawValue().toFloat();
+    //     const float tiltDesired = pitchNow + tiltIncDesired;
+
+    //     auto wrap180 = [](float deg) {
+    //         while (deg > 180.f) deg -= 360.f;
+    //         while (deg < -180.f) deg += 360.f;
+    //         return deg;
+    //     };
+
+    //     if (_activeGimbal->yawLock()) {
+    //         const float absYawNow = _activeGimbal->absoluteYaw()->rawValue().toFloat();
+    //         const float yawAbsDesired = wrap180(absYawNow + panIncDesired);
+    //         sendPitchAbsoluteYaw(tiltDesired, yawAbsDesired, false);
+    //     } else {
+    //         const float bodyYawNow = _activeGimbal->bodyYaw()->rawValue().toFloat();
+    //         const float yawBodyDesired = wrap180(bodyYawNow + panIncDesired);
+    //         sendPitchBodyYaw(tiltDesired, yawBodyDesired, false);
+    //     }
+
+        // static qint64 lastLogMs = 0;
+        // const qint64 nowMs = QDateTime::currentMSecsSinceEpoch();
+        // if (nowMs - lastLogMs > 200) { // log at most 5 Hz
+        //     lastLogMs = nowMs;
+
+        //     qDebug().nospace()
+        //         << "onScreen: panPct=" << panPct
+        //         << " tiltPct=" << tiltPct
+        //         << " clickPoint=" << clickAndPoint
+        //         << " clickDrag=" << clickAndDrag
+        //         << " yawLock=" << (_activeGimbal ? _activeGimbal->yawLock() : false)
+        //         << " bodyYaw=" << (_activeGimbal ? _activeGimbal->bodyYaw()->rawValue().toFloat() : 0.f)
+        //         << " absYaw=" << (_activeGimbal ? _activeGimbal->absoluteYaw()->rawValue().toFloat() : 0.f)
+        //         << " pitch="  << (_activeGimbal ? _activeGimbal->absolutePitch()->rawValue().toFloat() : 0.f);
+        // }
+
+        // qDebug().nospace()
+        //     << "clickPoint math: "
+        //     << "hFov=" << hFov
+        //     << " vFov=" << vFov
+        //     << " stepScale=" << stepScale
+        //     << " panInc=" << panIncDesired
+        //     << " tiltInc=" << tiltIncDesired
+        //     << " speedNow=" << speedNow;
+    }else if (clickAndDrag) { // based on maximum speed
         // Should send rate commands, but it seems for some reason it is not working on AP side.
         // Pitch works ok but yaw doesn't stop, it keeps like inertia, like if it was buffering the messages.
         // So we do a workaround with angle targets
@@ -478,6 +695,7 @@ void GimbalController::sendPitchBodyYaw(float pitch, float yaw, bool showError)
     if (!_tryGetGimbalControl()) {
         return;
     }
+    qDebug()<<"body----------------------------------------------------------------";
 
     _rateSenderTimer.stop();
     _activeGimbal->setAbsolutePitch(0.0f);
@@ -488,6 +706,8 @@ void GimbalController::sendPitchBodyYaw(float pitch, float yaw, bool showError)
     const unsigned flags = GIMBAL_MANAGER_FLAGS_ROLL_LOCK
                          | GIMBAL_MANAGER_FLAGS_PITCH_LOCK
                          | GIMBAL_MANAGER_FLAGS_YAW_IN_VEHICLE_FRAME;
+
+    qDebug()<<"pitch "<<pitch<<" yaw "<<yaw;
 
     _vehicle->sendMavCommand(
         _activeGimbal->managerCompid()->rawValue().toUInt(),
@@ -507,6 +727,8 @@ void GimbalController::sendPitchAbsoluteYaw(float pitch, float yaw, bool showErr
     if (!_tryGetGimbalControl()) {
         return;
     }
+
+    qDebug()<<"absolute--------------------------------------------------------------";
 
     _rateSenderTimer.stop();
     _activeGimbal->setAbsolutePitch(0.0f);
