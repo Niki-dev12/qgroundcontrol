@@ -65,12 +65,13 @@ Control {
         }
 
         QGCMouseArea {
-            anchors.fill:       parent
-            acceptedButtons:    Qt.LeftButton | Qt.RightButton
+            anchors.fill: parent  //dev
+            acceptedButtons: Qt.RightButton  //dev
 
             onClicked: (mouse) => {
                 if (!ScreenTools.isMobile && mouse.button === Qt.RightButton) {
                     _showSelectionUI = true
+                    mouse.accepted = true  //dev
                 }
             }
 

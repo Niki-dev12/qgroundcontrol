@@ -993,6 +993,7 @@ private:
     void _handleCameraImageCaptured     (const mavlink_message_t& message);
     void _handleCommandLong             (const mavlink_message_t& message);
     void _handleSpatialUser4            (const mavlink_command_long_t& cmd);
+    void _handleSpatialUser3            (const mavlink_command_long_t& cmd); //dev
     QString _latLonToMgrs               (double latitudeDeg, double longitudeDeg, int meterPrecision);
     void _missionManagerError           (int errorCode, const QString& errorMsg);
     void _geoFenceManagerError          (int errorCode, const QString& errorMsg);
@@ -1311,6 +1312,18 @@ private:
     QGeoCoordinate              _altitudeAboveTerrLastCoord;
     float                       _altitudeAboveTerrLastRelAlt = qQNaN();
 
+    //dev
+    // Geopixel helper
+    static constexpr qint64 kGeoStaleMs = 10'000;
+    QTimer _geopixelPruneTimer;
+    QHash<int, qint64> _user4LastSeenMs;
+    QHash<int, qint64> _user3LastSeenMs;
+    void _pruneGeopixelDetections();
+    void _pruneOneList(QmlObjectListModel& list,
+                   QHash<int, GeopixelDetection*>& byId,
+                   QHash<int, qint64>& lastSeenMs);
+    //dev
+
 public:
     int32_t getMessageRate(uint8_t compId, uint16_t msgId);
     void setMessageRate(uint8_t compId, uint16_t msgId, int32_t rate);
@@ -1361,6 +1374,7 @@ private:
     Q_PROPERTY(int     requestOperatorControlRemainingMsecs  READ requestOperatorControlRemainingMsecs  CONSTANT)
     Q_PROPERTY(bool    sendControlRequestAllowed             READ sendControlRequestAllowed             NOTIFY sendControlRequestAllowedChanged)
     Q_PROPERTY(QmlObjectListModel* geopixelDetections READ geopixelDetections CONSTANT)
+    Q_PROPERTY(QmlObjectListModel* geopixelDetectionsUser3 READ geopixelDetectionsUser3 CONSTANT) //dev
 
     uint8_t sysidInControl() const { return _sysid_in_control; }
     bool    gcsControlStatusFlags_SystemManager() const { return _gcsControlStatusFlags_SystemManager; }
@@ -1403,6 +1417,8 @@ public:
     Q_INVOKABLE void resetErrorLevelMessages();
     Q_INVOKABLE void clearMessages();
 
+    Q_INVOKABLE QObject* geopixelDetectionUser3ById(int objectId) const; //dev
+    
     bool messageTypeNone() const;
     bool messageTypeNormal() const;
     bool messageTypeWarning() const;
@@ -1413,6 +1429,7 @@ public:
     // StatusTextHandler* statusTextHandler() { return m_statusTextHandler; }
 
     QmlObjectListModel* geopixelDetections() { return &_geopixelDetections; }
+    QmlObjectListModel* geopixelDetectionsUser3()  { return &_geopixelDetectionsUser3; } //dev
 
 signals:
     void textMessageReceived(int sysid, int componentid, int severity, QString text, QString description);
@@ -1470,9 +1487,12 @@ private:
 
     MAVLinkLogManager *_mavlinkLogManager = nullptr;
 
+    //dev
     QmlObjectListModel          _geopixelDetections { this };
     QHash<int, GeopixelDetection*> _geopixelDetectionsById;
-
+    QmlObjectListModel             _geopixelDetectionsUser3 { this };
+    QHash<int, GeopixelDetection*> _geopixelDetectionsUser3ById;
+    //dev
 /*---------------------------------------------------------------------------*/
 };
 Q_DECLARE_METATYPE(Vehicle::MavCmdResultFailureCode_t)
