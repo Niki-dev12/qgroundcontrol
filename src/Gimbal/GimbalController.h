@@ -66,6 +66,8 @@ private slots:
 private:
     float _adaptiveDragSpeedDegS() const;
     float _adaptiveOnscreenSpeedDegS() const;
+    static bool _readFloatProperty(const QObject* object, const char* name, float& value);
+
 
 private:
     struct GimbalPairId {
