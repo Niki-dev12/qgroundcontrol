@@ -78,6 +78,8 @@ public:
     double currentCameraAspect();
     Q_INVOKABLE void requestCameraFovForComp(int compId);
 
+    void handleCameraFovStatusFromRequest(const mavlink_message_t& message);
+
 private:
     int _zoomValueCurrent = 0;
 

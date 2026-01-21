@@ -32,6 +32,36 @@
 
 static constexpr double kPi = M_PI;
 
+static void _cameraFovStatusRequestHandler(
+    void* resultHandlerData,
+    MAV_RESULT result,
+    Vehicle::RequestMessageResultHandlerFailureCode_t failureCode,
+    const mavlink_message_t& message)
+{
+    std::unique_ptr<QPointer<QGCCameraManager>> cameraManagerGuard(
+        static_cast<QPointer<QGCCameraManager>*>(resultHandlerData));
+
+    if (!cameraManagerGuard || cameraManagerGuard->isNull()) {
+        return;
+    }
+
+    QGCCameraManager* const cameraManager = cameraManagerGuard->data();
+
+    if (result != MAV_RESULT_ACCEPTED) {
+        qCDebug(CameraManagerLog)
+            << "CAMERA_FOV_STATUS request failed. result:" << result
+            << "failureCode:" << failureCode;
+        return;
+    }
+
+    if (message.msgid != MAVLINK_MSG_ID_CAMERA_FOV_STATUS) {
+        qCDebug(CameraManagerLog) << "Unexpected message id:" << message.msgid;
+        return;
+    }
+
+    cameraManager->handleCameraFovStatusFromRequest(message);
+}
+
 QGC_LOGGING_CATEGORY(CameraManagerLog, "qgc.camera.qgccameramanager")
 
 QVariantList QGCCameraManager::_cameraList;
@@ -267,8 +297,8 @@ void QGCCameraManager::_handleCameraInfo(const mavlink_message_t& message)
     qCDebug(CameraManagerLog) << "_handleCameraInfo";
 
     // Decode first so 'info' is available for aspect/FOV calculations below
-    mavlink_camera_information_t info{};
-    mavlink_msg_camera_information_decode(&message, &info);
+    mavlink_camera_information_t camInfo{};
+    mavlink_msg_camera_information_decode(&message, &camInfo);
 
     //-- Have we requested it?
     const QString sCompID = QString::number(message.compid);
@@ -284,11 +314,11 @@ void QGCCameraManager::_handleCameraInfo(const mavlink_message_t& message)
 
         qCDebug(CameraManagerLog)
             << "_handleCameraInfo:"
-            << reinterpret_cast<const char*>(info.model_name)
-            << reinterpret_cast<const char*>(info.vendor_name)
+            << reinterpret_cast<const char*>(camInfo.model_name)
+            << reinterpret_cast<const char*>(camInfo.vendor_name)
             << "Comp ID:" << message.compid;
 
-        auto* pCamera = _vehicle->firmwarePlugin()->createCameraControl(&info, _vehicle, message.compid, this);
+        auto* pCamera = _vehicle->firmwarePlugin()->createCameraControl(&camInfo, _vehicle, message.compid, this);
         if (pCamera) {
             _addCameraControlToLists(pCamera);
         }
@@ -296,10 +326,10 @@ void QGCCameraManager::_handleCameraInfo(const mavlink_message_t& message)
 
     double aspect = std::numeric_limits<double>::quiet_NaN();
 
-    if (info.resolution_h > 0 && info.resolution_v > 0) {
-        aspect = double(info.resolution_v) / double(info.resolution_h);
-    } else if (info.sensor_size_h > 0.f && info.sensor_size_v > 0.f) {
-        aspect = double(info.sensor_size_v) / double(info.sensor_size_h);
+    if (camInfo.resolution_h > 0 && camInfo.resolution_v > 0) {
+        aspect = double(camInfo.resolution_v) / double(camInfo.resolution_h);
+    } else if (camInfo.sensor_size_h > 0.f && camInfo.sensor_size_v > 0.f) {
+        aspect = double(camInfo.sensor_size_v) / double(camInfo.sensor_size_h);
     }
 
     _aspectByCompId.insert(message.compid, aspect);
@@ -773,12 +803,19 @@ QList<CameraMetaData*> QGCCameraManager::_parseCameraMetaData(const QString &jso
     return cameraList;
 }
 
+void QGCCameraManager::handleCameraFovStatusFromRequest(const mavlink_message_t& message)
+{
+    _handleCameraFovStatus(message);
+}
 
 void QGCCameraManager::requestCameraFovForComp(int compId) {
     if (!_vehicle) {
         qCWarning(CameraManagerLog) << "requestCameraFovForComp: vehicle is null";
         return;
     }
+
+    auto* const cameraManagerGuard = new QPointer<QGCCameraManager>(this);
+    _vehicle->requestMessage(_cameraFovStatusRequestHandler, cameraManagerGuard, compId, MAVLINK_MSG_ID_CAMERA_FOV_STATUS);
 }
 
 //-----------------------------------------------------------------------------
@@ -806,7 +843,7 @@ void QGCCameraManager::_handleCameraFovStatus(const mavlink_message_t& message)
 
     double aspect = aspectForComp(message.compid);
     if (!std::isfinite(aspect) || aspect <= 0.0) {
-        aspect = 16.0 / 9.0;
+        aspect = 9.0 / 16.0;
     }
 
     const double hfovRad = fov.hfov * kPi / 180.0;

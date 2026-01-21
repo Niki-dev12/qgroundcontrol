@@ -22,6 +22,34 @@
 #include <algorithm>
 #include <QtCore/QVariant>
 
+// ─────────────────────────────────────────────
+// Local math helpers
+// ─────────────────────────────────────────────
+static float wrap180(float deg)
+{
+    if (!std::isfinite(deg)) {
+        return 0.f;
+    }
+
+    while (deg > 180.f) {
+        deg -= 360.f;
+    }
+    while (deg < -180.f) {
+        deg += 360.f;
+    }
+    return deg;
+}
+
+static float deg2rad(float deg)
+{
+    return deg * float(M_PI) / 180.f;
+}
+
+static float rad2deg(float rad)
+{
+    return rad * 180.f / float(M_PI);
+}
+
 QGC_LOGGING_CATEGORY(GimbalControllerLog, "qgc.gimbal.gimbalcontroller")
 
 GimbalController::GimbalController(Vehicle *vehicle)
@@ -435,24 +463,24 @@ void GimbalController::centerGimbal()
     sendPitchBodyYaw(0.0, 0.0);
 }
 
-bool GimbalController::_readFloatProperty(const QObject* object, const char* name, float& value)
+bool GimbalController::_readFloatProperty(const QObject* object, const char* name, float& outValue)
 {
     if (!object) {
         return false;
     }
 
-    const QVariant v = object->property(name);
-    if (!v.isValid()) {
+    const QVariant propValue = object->property(name);
+    if (!propValue.isValid()) {
         return false;
     }
 
-    bool ok = false;
-    const float f = v.toFloat(&ok);
-    if (!ok) {
+    bool conversionOk = false;
+    const float floatValue = propValue.toFloat(&conversionOk);
+    if (!conversionOk) {
         return false;
     }
 
-    value = f;
+    outValue = floatValue;
     return true;
 }
 
@@ -470,7 +498,7 @@ float GimbalController::_adaptiveOnscreenSpeedDegS() const
     float zoom = 0.f;
     float zoomMin = 0.f;
     float zoomMax = 1.f;
-    bool haveZoom = false;
+    bool hasZoom = false;
 
     if (_vehicle && _vehicle->cameraManager()) {
         QObject* cam = _vehicle->cameraManager()->property("currentCameraInstance").value<QObject*>();
@@ -481,34 +509,38 @@ float GimbalController::_adaptiveOnscreenSpeedDegS() const
             cam = _vehicle->cameraManager()->property("activeCamera").value<QObject*>();
         }
 
+        bool hasMinZoom = false;
+        bool hasMaxZoom = false;
+
         if (cam) {
-            haveZoom =
+            hasZoom =
                 _readFloatProperty(cam, "zoomLevel", zoom) ||
                 _readFloatProperty(cam, "zoom", zoom) ||
                 _readFloatProperty(cam, "zoomValue", zoom);
 
-            const bool okMin =
+            hasMinZoom =
                 _readFloatProperty(cam, "zoomMin", zoomMin) ||
                 _readFloatProperty(cam, "minZoom", zoomMin);
 
-            const bool okMax =
+            hasMaxZoom =
                 _readFloatProperty(cam, "zoomMax", zoomMax) ||
                 _readFloatProperty(cam, "maxZoom", zoomMax);
 
-            // If min/max not provided
-            if (haveZoom && (!okMin || !okMax || (zoomMax <= zoomMin))) {
+            if (hasZoom && (!hasMinZoom || !hasMaxZoom || (zoomMax <= zoomMin))) {
                 zoomMin = 0.f;
                 zoomMax = (zoom > 1.01f) ? 100.f : 1.f;
             }
         }
     }
 
-    if (!haveZoom || (zoomMax <= zoomMin)) {
+    if (!hasZoom || (zoomMax <= zoomMin)) {
         return zoomMaxSpeed;
     }
 
-    const float t = std::clamp((zoom - zoomMin) / (zoomMax - zoomMin), 0.f, 1.f);
-    return zoomMaxSpeed + t * (zoomMinSpeed - zoomMaxSpeed);
+
+    const float zoomNormalized = std::clamp((zoom - zoomMin) / (zoomMax - zoomMin), 0.f, 1.f);
+    return zoomMaxSpeed + zoomNormalized * (zoomMinSpeed - zoomMaxSpeed);
+
 }
 
 float GimbalController::_adaptiveDragSpeedDegS() const
@@ -555,19 +587,6 @@ void GimbalController::gimbalOnScreenControl(float panPct, float tiltPct, bool c
                 vFov = tmp;
             }
         }
-
-        auto wrap180 = [](float deg) {
-            while (deg > 180.f) {
-                deg -= 360.f;
-            }
-            while (deg < -180.f) {
-                deg += 360.f;
-            }
-            return deg;
-        };
-
-        auto deg2rad = [](float deg) { return deg * float(M_PI) / 180.f; };
-        auto rad2deg = [](float rad) { return rad * 180.f / float(M_PI); };
 
         // Map normalized screen offset to angular offset using a pinhole camera model.
         // This keeps click-to-point response consistent across different FOV/zoom values.
