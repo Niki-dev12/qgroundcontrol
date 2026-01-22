@@ -45,7 +45,12 @@ public:
     Q_PROPERTY(QStringList              cameraLabels            READ cameraLabels                                   NOTIFY cameraLabelsChanged)
     Q_PROPERTY(MavlinkCameraControl*    currentCameraInstance   READ currentCameraInstance                          NOTIFY currentCameraChanged)
     Q_PROPERTY(int                      currentCamera           READ currentCamera      WRITE  setCurrentCamera     NOTIFY currentCameraChanged)
-    Q_PROPERTY(int currentZoomLevel READ currentZoomLevel NOTIFY currentZoomLevelChanged)
+    Q_PROPERTY(int                      currentZoomLevel        READ currentZoomLevel                               NOTIFY currentZoomLevelChanged)
+    Q_PROPERTY(double                   currentCameraHFov       READ currentCameraHFov                              NOTIFY currentCameraFovChanged)
+    Q_PROPERTY(double                   currentCameraVFov       READ currentCameraVFov                              NOTIFY currentCameraFovChanged)
+
+    double currentCameraHFov() const;
+    double currentCameraVFov() const;
 
     virtual QmlObjectListModel*     cameras             ()          { return &_cameras; }       ///< List of cameras provided by current vehicle
     virtual QStringList             cameraLabels        ()          { return _cameraLabels; }   ///< Camera names to show the user (for selection)
@@ -82,13 +87,15 @@ public:
 
 private:
     int _zoomValueCurrent = 0;
+    void _syncCurrentCameraFovToSettings();
 
 signals:
     void    camerasChanged          ();
     void    cameraLabelsChanged     ();
     void    currentCameraChanged    ();
     void    streamChanged           ();
-    void currentZoomLevelChanged();
+    void    currentZoomLevelChanged ();
+    void    currentCameraFovChanged ();
 
 private slots:
     void _setCurrentZoomLevel(int level);
@@ -142,4 +149,10 @@ protected:
     static QVariantList _cameraList; ///< Standard QGC camera list
 
     QHash<int, double> _aspectByCompId;
+
+    struct FovInfo {
+        double hfovDeg = std::numeric_limits<double>::quiet_NaN();
+        double vfovDeg = std::numeric_limits<double>::quiet_NaN();
+    };
+    QHash<int, FovInfo> _fovByCompId;
 };

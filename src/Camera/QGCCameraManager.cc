@@ -127,6 +127,13 @@ void QGCCameraManager::setCurrentCamera(int sel)
         _currentCameraIndex = sel;
         emit currentCameraChanged();
         emit streamChanged();
+        emit currentCameraFovChanged(); 
+    }
+
+    _syncCurrentCameraFovToSettings();
+
+    if (auto* cam = currentCameraInstance()) {
+        requestCameraFovForComp(cam->compID());
     }
 }
 
@@ -832,6 +839,29 @@ double QGCCameraManager::currentCameraAspect(){
     }
     return std::numeric_limits<double>::quiet_NaN();
 }
+
+double QGCCameraManager::currentCameraHFov() const
+{
+    auto* cam = const_cast<QGCCameraManager*>(this)->currentCameraInstance();
+    if (!cam) {
+        return std::numeric_limits<double>::quiet_NaN();
+    }
+
+    auto it = _fovByCompId.constFind(cam->compID());
+    return (it == _fovByCompId.cend()) ? std::numeric_limits<double>::quiet_NaN() : it->hfovDeg;
+}
+
+double QGCCameraManager::currentCameraVFov() const
+{
+    auto* cam = const_cast<QGCCameraManager*>(this)->currentCameraInstance();
+    if (!cam) {
+        return std::numeric_limits<double>::quiet_NaN();
+    }
+
+    auto it = _fovByCompId.constFind(cam->compID());
+    return (it == _fovByCompId.cend()) ? std::numeric_limits<double>::quiet_NaN() : it->vfovDeg;
+}
+
 void QGCCameraManager::_handleCameraFovStatus(const mavlink_message_t& message)
 {
     mavlink_camera_fov_status_t fov{};
@@ -858,9 +888,30 @@ void QGCCameraManager::_handleCameraFovStatus(const mavlink_message_t& message)
         return;
     }
 
+    _fovByCompId[message.compid] = { fov.hfov, vfovDeg };
+
+    if (auto* cam = currentCameraInstance(); cam && cam->compID() == message.compid) {
+        _syncCurrentCameraFovToSettings();
+        emit currentCameraFovChanged();
+    }
+}
+
+void QGCCameraManager::_syncCurrentCameraFovToSettings()
+{
+    auto* cam = currentCameraInstance();
+    if (!cam) {
+        return;
+    }
+
+    const int compId = cam->compID();
+    auto it = _fovByCompId.constFind(compId);
+    if (it == _fovByCompId.cend()) {
+        return;
+    }
+
     auto* settings = SettingsManager::instance()->gimbalControllerSettings();
-    settings->CameraHFov()->setRawValue(fov.hfov);
-    settings->CameraVFov()->setRawValue(vfovDeg);
+    settings->CameraHFov()->setRawValue(it->hfovDeg);
+    settings->CameraVFov()->setRawValue(it->vfovDeg);
 }
 
 void QGCCameraManager::_setCurrentZoomLevel(int level)
