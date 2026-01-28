@@ -64,6 +64,12 @@ private slots:
     void _rateSenderTimeout();
 
 private:
+    float _adaptiveDragSpeedDegS() const;
+    float _adaptiveOnscreenSpeedDegS() const;
+    static bool _readFloatProperty(const QObject* object, const char* name, float& value);
+
+
+private:
     struct GimbalPairId {
         GimbalPairId() = default;
         GimbalPairId(uint8_t _managerCompid, uint8_t _deviceId)

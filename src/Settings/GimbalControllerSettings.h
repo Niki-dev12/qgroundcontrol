@@ -27,4 +27,6 @@ public:
     DEFINE_SETTINGFACT(toolbarIndicatorShowAzimuth)
     DEFINE_SETTINGFACT(toolbarIndicatorShowAcquireReleaseControl)
     DEFINE_SETTINGFACT(joystickButtonsSpeed)
+    DEFINE_SETTINGFACT(zoomMaxSpeed)
+    DEFINE_SETTINGFACT(zoomMinSpeed)
 };
