@@ -236,7 +236,7 @@ void JoystickSDL::_detectAndSetupAxisMapping()
     }
 
     const int rawAxes = SDL_JoystickNumAxes(_sdlJoystick);
-    if (_axisCount > 4 && rawAxes > 4) {
+    if (rawAxes > 4 && _axisMap.size() > 4) {
         _axisMap[3] = 4;
         _axisMap[4] = 3;
         _useAxisMap = true;
