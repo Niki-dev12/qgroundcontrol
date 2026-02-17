@@ -18,6 +18,11 @@
 
 QGC_LOGGING_CATEGORY(JoystickSDLLog, "qgc.joystick.joysticksdl")
 
+static bool _isT20Name(const QString& n)
+{
+    return n.contains("T20", Qt::CaseInsensitive);
+}
+
 JoystickSDL::JoystickSDL(const QString &name, int axisCount, int buttonCount, int hatCount, int index, bool isGameController, QObject *parent)
     : Joystick(name, axisCount, buttonCount, hatCount, parent)
     , _isGameController(isGameController)
@@ -88,7 +93,12 @@ QMap<QString, Joystick*> JoystickSDL::discover()
         }
         SDL_JoystickClose(sdlJoystick);
 
-        const bool isGameController = SDL_IsGameController(i);
+        bool isGameController = SDL_IsGameController(i);
+        if (_isT20Name(name)) {
+            isGameController = false;
+        }
+
+        // const bool isGameController = SDL_IsGameController(i);
         qCDebug(JoystickSDLLog) << name << "axes:" << axisCount << "buttons:" << buttonCount << "hats:" << hatCount << "isGC:" << isGameController;
 
         // Check for joysticks with duplicate names and differentiate the keys when necessary.
@@ -128,6 +138,15 @@ bool JoystickSDL::_open()
 
     qCDebug(JoystickSDLLog) << "Opened" << SDL_JoystickName(_sdlJoystick) << "joystick at" << _sdlJoystick;
 
+    if (!_isGameController) {
+        _detectAndSetupAxisMapping();
+    }
+
+    const SDL_JoystickGUID guid = SDL_JoystickGetGUID(_sdlJoystick);
+    char guidStr[33] = {};
+    SDL_JoystickGetGUIDString(guid, guidStr, sizeof(guidStr));
+    qCInfo(JoystickSDLLog) << "Joystick GUID:" << guidStr;
+
     return true;
 }
 
@@ -148,6 +167,8 @@ void JoystickSDL::_close()
 
     _sdlJoystick = nullptr;
     _sdlController = nullptr;
+
+    _useAxisMap = false;
 }
 
 bool JoystickSDL::_update()
@@ -163,28 +184,85 @@ bool JoystickSDL::_update()
 
 bool JoystickSDL::_getButton(int i) const
 {
-    int button = -1;
-
-    if (_isGameController) {
-        button = SDL_GameControllerGetButton(_sdlController, SDL_GameControllerButton(i));
-    } else {
-        button = SDL_JoystickGetButton(_sdlJoystick, i);
+    if (!_sdlJoystick || i < 0) {
+        return false;
     }
 
-    return (button == 1);
+    const int rawCount = SDL_JoystickNumButtons(_sdlJoystick);
+    if (i >= rawCount) {
+        return false;
+    }
+
+    return SDL_JoystickGetButton(_sdlJoystick, i) != 0;
 }
 
 int JoystickSDL::_getAxis(int i) const
 {
-    int axis = -1;
-
-    if (_isGameController) {
-        axis = SDL_GameControllerGetAxis(_sdlController, SDL_GameControllerAxis(i));
-    } else {
-        axis = SDL_JoystickGetAxis(_sdlJoystick, i);
+    if (!_sdlJoystick || i < 0) {
+        return 0;
     }
 
-    return axis;
+    if (_isGameController) {
+        return SDL_GameControllerGetAxis(_sdlController, SDL_GameControllerAxis(i));
+    }
+
+    const int readIndex = _mapAxisIndex(i);
+
+    const int rawCount = SDL_JoystickNumAxes(_sdlJoystick);
+    if (readIndex < 0 || readIndex >= rawCount) {
+        return 0;
+    }
+
+    return SDL_JoystickGetAxis(_sdlJoystick, readIndex);
+}
+
+void JoystickSDL::_detectAndSetupAxisMapping()
+{
+    _useAxisMap = false;
+
+    _axisMap.fill(-1);
+    for (int i = 0; i < _axisCount && i < static_cast<int>(_axisMap.size()); i++) {
+        _axisMap[i] = i;
+    }
+
+    // Only apply to T20
+    if (!_sdlJoystick) {
+        return;
+    }
+
+    const QString devName = QString::fromUtf8(SDL_JoystickName(_sdlJoystick));
+    if (!_isT20Name(devName)) {
+        return;
+    }
+
+    const int rawAxes = SDL_JoystickNumAxes(_sdlJoystick);
+    if (rawAxes > 4 && _axisMap.size() > 4) {
+        _axisMap[3] = 4;
+        _axisMap[4] = 3;
+        _useAxisMap = true;
+
+        qCInfo(JoystickSDLLog) << "T20 axis swap enabled (logical 3<->4)"
+                                 << "dev:" << devName
+                                 << "axisCount:" << _axisCount
+                                 << "rawAxes:" << rawAxes;
+    } else {
+        qCWarning(JoystickSDLLog) << "T20 detected but not enough axes to swap 3<->4"
+                                 << "dev:" << devName
+                                 << "axisCount:" << _axisCount
+                                 << "rawAxes:" << rawAxes;
+    }
+}
+
+int JoystickSDL::_mapAxisIndex(int logicalAxis) const
+{
+    if (!_useAxisMap) {
+        return logicalAxis;
+    }
+    if (logicalAxis < 0 || logicalAxis >= static_cast<int>(_axisMap.size())) {
+        return logicalAxis;
+    }
+    const int mapped = _axisMap[logicalAxis];
+    return mapped >= 0 ? mapped : logicalAxis;
 }
 
 bool JoystickSDL::_getHat(int hat, int i) const

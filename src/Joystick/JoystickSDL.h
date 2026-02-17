@@ -13,6 +13,8 @@
 
 #include "Joystick.h"
 
+#include <array>
+
 struct _SDL_Joystick;
 typedef struct _SDL_Joystick SDL_Joystick;
 
@@ -51,4 +53,10 @@ private:
 
     SDL_Joystick *_sdlJoystick = nullptr;
     SDL_GameController *_sdlController = nullptr;
+
+    void _detectAndSetupAxisMapping();
+    int  _mapAxisIndex(int logicalAxis) const;
+
+    bool _useAxisMap = false;
+    std::array<int, 16> _axisMap{};
 };
