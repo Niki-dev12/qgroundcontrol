@@ -89,6 +89,8 @@ private:
     int _zoomValueCurrent = 0;
     void _syncCurrentCameraFovToSettings();
 
+    static bool _readFloatProperty(const QObject* obj, const char* name, float& out);
+
 signals:
     void    camerasChanged          ();
     void    cameraLabelsChanged     ();

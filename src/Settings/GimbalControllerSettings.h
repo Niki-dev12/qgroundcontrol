@@ -29,4 +29,5 @@ public:
     DEFINE_SETTINGFACT(joystickButtonsSpeed)
     DEFINE_SETTINGFACT(zoomMaxSpeed)
     DEFINE_SETTINGFACT(zoomMinSpeed)
+    DEFINE_SETTINGFACT(gimbalSpeed)
 };

@@ -77,6 +77,13 @@
     "type":              "uint32",
     "default":           60,
     "units":             "deg/s"
+},
+{
+    "name":              "gimbalSpeed",
+    "shortDesc":         "gimbal max speed",
+    "type":              "uint32",
+    "default":           80,
+    "units":             "deg"
 }
 ]
 }

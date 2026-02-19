@@ -23,9 +23,14 @@
 
 #include <QtCore/QSettings>
 #include <QtCore/QThread>
+#include "GimbalControllerSettings.h"
 
 QGC_LOGGING_CATEGORY(JoystickLog, "qgc.joystick.joystick")
 QGC_LOGGING_CATEGORY(JoystickValuesLog, "qgc.joystick.joystickvalues")
+
+#define MAX_SLIDER_POSITION 32767
+#define MIN_SLIDER_POSITION -32704
+#define STOP_CONDITION 3
 
 /*===========================================================================*/
 
@@ -576,6 +581,32 @@ void Joystick::_handleButtons()
     }
 }
 
+static Joystick::Calibration_t makeFixedCal(int minV, int centerV, int maxV, int deadband = 0, bool reversed = false)
+{
+    Joystick::Calibration_t c{};
+    c.min = minV;
+    c.center = centerV;
+    c.max = maxV;
+    c.deadband = deadband;
+    c.reversed = reversed;
+    return c;
+}
+
+int Joystick::deadbandFromPercent(float percent, int minValue, int maxValue)
+{
+    const float clampedPercent = std::clamp(percent, 0.0f, 100.0f);
+
+    const int axisSpan = maxValue - minValue;
+    const float halfAxisSpan = static_cast<float>(axisSpan) * 0.5f;
+
+    const float deadbandFloat = (clampedPercent / 100.0f) * halfAxisSpan;
+    const int deadband = static_cast<int>(std::lround(deadbandFloat));
+
+    const int maxDeadband = static_cast<int>(std::floor(halfAxisSpan));
+
+    return std::clamp(deadband, 0, maxDeadband);
+}
+
 void Joystick::_handleAxis()
 {
     const int axisDelay = static_cast<int>(1000.0f / _axisFrequencyHz);
@@ -618,6 +649,75 @@ void Joystick::_handleAxis()
     if (_axisCount > 5) {
         axis = _rgFunctionAxis[gimbalYawFunction];
         gimbalYaw = _adjustRange(_rgAxisValues[axis],   _rgCalibration[axis],_deadband);
+    }
+
+    if (_axisCount > 5 && _gimbalAxisEnabled) {
+
+        static int zeroCount = 0;
+        static bool stoppedSending = false;
+
+        const int pitchAxisIndex = _rgFunctionAxis[gimbalYawFunction];
+        const int yawAxisIndex   = 3;
+
+        const int pitchDeadband = deadbandFromPercent(15.0f, MIN_SLIDER_POSITION, MAX_SLIDER_POSITION);
+        const int yawDeadband   = deadbandFromPercent(15.0f, MIN_SLIDER_POSITION, MAX_SLIDER_POSITION);
+
+        const Calibration_t pitchCal = makeFixedCal(MIN_SLIDER_POSITION, 0, MAX_SLIDER_POSITION, /*deadband=*/pitchDeadband, /*reversed=*/true);
+        const Calibration_t yawCal   = makeFixedCal(MIN_SLIDER_POSITION, 0, MAX_SLIDER_POSITION, /*deadband=*/yawDeadband,   /*reversed=*/true);
+
+        const float pitchNorm = _adjustRange(_rgAxisValues[pitchAxisIndex], pitchCal, /*withDeadbands=*/true);
+        const float yawNorm   = _adjustRange(_rgAxisValues[yawAxisIndex],   yawCal,   /*withDeadbands=*/true);
+
+        auto* setting = SettingsManager::instance()->gimbalControllerSettings();
+        _gimbalMaxSpeed = setting->gimbalSpeed()->rawValue().toFloat();
+
+        const float pitchDegPerSec = pitchNorm * float(_gimbalMaxSpeed);
+        const float yawDegPerSec   = yawNorm   * float(_gimbalMaxSpeed);
+
+        const float epsilon = 0.0001f;
+
+        const bool isZero =
+            std::fabs(pitchDegPerSec) < epsilon &&
+            std::fabs(yawDegPerSec)   < epsilon;
+
+        if (isZero) {
+            zeroCount++;
+        } else {
+            zeroCount = 0;
+            stoppedSending = false;
+        }
+
+        // MAV_CMD_DO_GIMBAL_MANAGER_PITCHYAW
+        // GIMBAL_MANAGER_SET_ATTITUDE
+
+        auto sendPitchYawCmd = [&](float pitchRateDegS, float yawRateDegS) {
+            if (!_activeVehicle) {
+                return;
+            }
+
+            _activeVehicle->sendMavCommand(
+                1,
+                MAV_CMD_DO_GIMBAL_MANAGER_PITCHYAW,
+                false,
+                NAN,
+                NAN,
+                pitchRateDegS,
+                yawRateDegS,
+                12.0f,
+                0.0f,
+                1.0f
+            );
+        };
+
+        if (zeroCount >= STOP_CONDITION) {
+            if (!stoppedSending) {
+                sendPitchYawCmd(0.0f, 0.0f);
+                stoppedSending = true;
+            }
+
+        } else if (!stoppedSending) {
+            sendPitchYawCmd(pitchDegPerSec, yawDegPerSec);
+        }
     }
 
     if (_accumulator) {
@@ -698,6 +798,12 @@ void Joystick::startPolling(Vehicle* vehicle)
         }
 
         _activeVehicle = vehicle;
+
+        _gimbalMaxSpeed = SettingsManager::instance()
+            ->gimbalControllerSettings()
+            ->gimbalSpeed()
+            ->rawValue()
+            .toInt();
 
         // If joystick is not calibrated, disable it
         if ((axisCount() != 0) && !_calibrated) {
@@ -985,6 +1091,11 @@ void Joystick::setCalibrationMode(bool calibrating)
         _pollingStartedForCalibration = true;
         startPolling(MultiVehicleManager::instance()->activeVehicle());
     } else if (_pollingStartedForCalibration) {
+        if (_axisCount > 5) {
+            _rgFunctionAxis[gimbalYawFunction] = 4;
+            _rgFunctionAxis[gimbalPitchFunction] = 5;
+        }
+        _saveSettings();
         stopPolling();
     }
 }
