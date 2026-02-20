@@ -924,25 +924,34 @@ void QGCCameraManager::_syncCurrentCameraFovToSettings()
         return;
     }
 
-    const int compId = cam->compID();
-    auto it = _fovByCompId.constFind(compId);
-    if (it == _fovByCompId.cend()) {
-        return;
-    }
-
     auto* settings = SettingsManager::instance()->gimbalControllerSettings();
-    settings->CameraHFov()->setRawValue(it->hfovDeg);
-    settings->CameraVFov()->setRawValue(it->vfovDeg);
+    const int compId = cam->compID();
+    const auto it = _fovByCompId.constFind(compId);
+
+    const bool hasFovStatus = (it != _fovByCompId.cend()) && std::isfinite(it->hfovDeg) && it->hfovDeg >= 0.9;
+    if (hasFovStatus) {
+        settings->CameraHFov()->setRawValue(it->hfovDeg);
+        settings->CameraVFov()->setRawValue(it->vfovDeg);
+    }
 
     const float zoomMaxSpeed = settings->zoomMaxSpeed()->rawValue().toFloat();
     const float zoomMinSpeed = settings->zoomMinSpeed()->rawValue().toFloat();
 
     float zoom = 1.f;
-    const bool hasZoom = _readFloatProperty(cam, "zoomLevel", zoom) || _readFloatProperty(cam, "zoom", zoom);
+    bool  hasZoom = false;
 
-    if (!hasZoom) {
-        settings->gimbalSpeed()->setRawValue(zoomMaxSpeed);
-        return;
+    if (hasFovStatus) {
+        hasZoom =
+            _readFloatProperty(cam, "zoomLevel", zoom) ||
+            _readFloatProperty(cam, "zoom", zoom);
+
+        if (!hasZoom) {
+            settings->gimbalSpeed()->setRawValue(zoomMaxSpeed);
+            return;
+        }
+    } else {
+        zoom = 1.f;
+        hasZoom = true;
     }
 
     zoom = std::clamp(zoom, 1.f, 100.f);
