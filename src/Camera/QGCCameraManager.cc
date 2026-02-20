@@ -926,12 +926,12 @@ void QGCCameraManager::_syncCurrentCameraFovToSettings()
 
     auto* settings = SettingsManager::instance()->gimbalControllerSettings();
     const int compId = cam->compID();
-    const auto it = _fovByCompId.constFind(compId);
+    const auto camFov = _fovByCompId.constFind(compId);
 
-    const bool hasFovStatus = (it != _fovByCompId.cend()) && std::isfinite(it->hfovDeg) && it->hfovDeg >= 0.9;
+    const bool hasFovStatus = (camFov != _fovByCompId.cend()) && std::isfinite(camFov->hfovDeg) && camFov->hfovDeg >= 0.9;
     if (hasFovStatus) {
-        settings->CameraHFov()->setRawValue(it->hfovDeg);
-        settings->CameraVFov()->setRawValue(it->vfovDeg);
+        settings->CameraHFov()->setRawValue(camFov->hfovDeg);
+        settings->CameraVFov()->setRawValue(camFov->vfovDeg);
     }
 
     const float zoomMaxSpeed = settings->zoomMaxSpeed()->rawValue().toFloat();
