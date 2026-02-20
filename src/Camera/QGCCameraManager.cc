@@ -896,6 +896,27 @@ void QGCCameraManager::_handleCameraFovStatus(const mavlink_message_t& message)
     }
 }
 
+bool QGCCameraManager::_readFloatProperty(const QObject* object, const char* propertyName, float& valueOut)
+{
+    if (!object) {
+        return false;
+    }
+
+    const QVariant propertyVariant = object->property(propertyName);
+    if (!propertyVariant.isValid()) {
+        return false;
+    }
+
+    bool convertOk = false;
+    const float propertyValue = propertyVariant.toFloat(&convertOk);
+    if (!convertOk) {
+        return false;
+    }
+
+    valueOut = propertyValue;
+    return true;
+}
+
 void QGCCameraManager::_syncCurrentCameraFovToSettings()
 {
     auto* cam = currentCameraInstance();
@@ -903,15 +924,41 @@ void QGCCameraManager::_syncCurrentCameraFovToSettings()
         return;
     }
 
+    auto* settings = SettingsManager::instance()->gimbalControllerSettings();
     const int compId = cam->compID();
-    auto it = _fovByCompId.constFind(compId);
-    if (it == _fovByCompId.cend()) {
-        return;
+    const auto camFov = _fovByCompId.constFind(compId);
+
+    const bool hasFovStatus = (camFov != _fovByCompId.cend()) && std::isfinite(camFov->hfovDeg) && camFov->hfovDeg >= 0.9;
+    if (hasFovStatus) {
+        settings->CameraHFov()->setRawValue(camFov->hfovDeg);
+        settings->CameraVFov()->setRawValue(camFov->vfovDeg);
     }
 
-    auto* settings = SettingsManager::instance()->gimbalControllerSettings();
-    settings->CameraHFov()->setRawValue(it->hfovDeg);
-    settings->CameraVFov()->setRawValue(it->vfovDeg);
+    const float zoomMaxSpeed = settings->zoomMaxSpeed()->rawValue().toFloat();
+    const float zoomMinSpeed = settings->zoomMinSpeed()->rawValue().toFloat();
+
+    float zoom = 1.f;
+    bool  hasZoom = false;
+
+    if (hasFovStatus) {
+        hasZoom =
+            _readFloatProperty(cam, "zoomLevel", zoom) ||
+            _readFloatProperty(cam, "zoom", zoom);
+
+        if (!hasZoom) {
+            settings->gimbalSpeed()->setRawValue(zoomMaxSpeed);
+            return;
+        }
+    } else {
+        zoom = 1.f;
+        hasZoom = true;
+    }
+
+    zoom = std::clamp(zoom, 1.f, 100.f);
+    const float zoomNormalized = (zoom - 1.f) / 99.f;
+    const float resultSpeed = zoomMaxSpeed + zoomNormalized * (zoomMinSpeed - zoomMaxSpeed);
+
+    settings->gimbalSpeed()->setRawValue(resultSpeed);
 }
 
 void QGCCameraManager::_setCurrentZoomLevel(int level)

@@ -183,6 +183,10 @@ public:
     /// Set joystick button repeat rate (in Hz)
     void setButtonFrequency(float val);
 
+    int gimbalMaxSpeed() const { return _gimbalMaxSpeed; }
+    static int deadbandFromPercent(float percent, int minVal, int maxVal);
+
+
 signals:
     // The raw signals are only meant for use by calibration
     void rawAxisValueChanged(int index, int value);
@@ -366,4 +370,7 @@ private:
     static constexpr const char *_buttonActionLandingGearRetract=  QT_TR_NOOP("Landing gear retract");
     static constexpr const char *_buttonActionMotorInterlockEnable=   QT_TR_NOOP("Motor Interlock enable");
     static constexpr const char *_buttonActionMotorInterlockDisable=  QT_TR_NOOP("Motor Interlock disable");
+
+    bool _gimbalAxisEnabled = true;
+    int _gimbalMaxSpeed = 0;
 };
