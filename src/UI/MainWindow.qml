@@ -23,6 +23,9 @@ import QGroundControl.FlightMap
 
 import QGroundControl.UTMSP
 
+//FPV
+import Qt.labs.settings 1.0 
+
 /// @brief Native QML top level window
 /// All properties defined here are visible to all QML pages.
 ApplicationWindow {
@@ -32,10 +35,67 @@ ApplicationWindow {
     property bool   _utmspSendActTrigger
     property bool   _utmspStartTelemetry
 
-    Component.onCompleted: {
-        // Start the sequence of first run prompt(s)
-        firstRunPromptManager.nextPrompt()
+    //FPV
+    property real  _widthEdge:       40
+    property real  _betweenSpacing:  43
+    property string edgeColor:       "#222222"
+    property string minMAXBUTTON: "F11"
+
+    readonly property var _activeVehicle: QGroundControl.multiVehicleManager.activeVehicle
+    readonly property int _modelId: _activeVehicle ? _activeVehicle.modelId : -1
+
+    // UI for window geometry
+    Settings {
+        id: winPrefs
+        category: "MainWindow"
+        property bool startFullScreen: false
+        property int normalX: 0
+        property int normalY: 0
+        property int normalW: 1280
+        property int normalH: 800
     }
+
+    // True if currently fullscreen
+    property bool isFullScreen: visibility === Window.FullScreen
+
+    function toggleFullScreen() {
+        if (visibility === Window.FullScreen) {
+            // Leaving fullscreen
+            visibility = Window.Windowed
+            x = winPrefs.normalX
+            y = winPrefs.normalY
+            width  = winPrefs.normalW
+            height = winPrefs.normalH
+            winPrefs.startFullScreen = false
+        } else {
+            // Entering fullscreen and remember
+            winPrefs.normalX = x
+            winPrefs.normalY = y
+            winPrefs.normalW = width
+            winPrefs.normalH = height
+            visibility = Window.FullScreen
+            winPrefs.startFullScreen = true
+        }
+    }
+
+    // Keep the setting
+    onVisibilityChanged: {
+        winPrefs.startFullScreen = (visibility === Window.FullScreen)
+    }
+
+    Component.onCompleted: {
+        firstRunPromptManager.nextPrompt()
+        if (winPrefs.startFullScreen) {
+            visibility = Window.FullScreen
+        }
+    }
+
+    Shortcut {
+        sequence: minMAXBUTTON
+        context: Qt.ApplicationShortcut
+        onActivated: mainWindow.toggleFullScreen()
+    }
+    //FPV
 
     /// Saves main window position and size and re-opens it in the same position and size next time
     MainWindowSavedState {

@@ -287,6 +287,12 @@ public:
 
     Q_PROPERTY(bool     mavlinkSigning              READ mavlinkSigning             NOTIFY mavlinkSigningChanged)
 
+    //FPV
+    Q_PROPERTY(bool hudVisible READ hudVisible NOTIFY hudVisibleChanged)
+    Q_PROPERTY(bool aiStrike READ aiStrike NOTIFY aiStrikeChanged)
+    Q_PROPERTY(bool currentTrackerTypeValue READ currentTrackerTypeValue NOTIFY trackerTypeChanged)
+    Q_PROPERTY(bool currentSelectModeValue READ currentSelectModeValue NOTIFY selectModeChanged)
+    //FPV
     /// Resets link status counters
     Q_INVOKABLE void resetCounters  ();
 
@@ -383,6 +389,17 @@ public:
     ///     @param timeoutSec Disabled motor after this amount of time
     Q_INVOKABLE void motorTest(int motor, int percent, int timeoutSecs, bool showError);
 
+    //FPV
+    Q_INVOKABLE void onSidePanelButtonClicked(int command, int param1, bool isToggle, bool enabled);
+    Q_INVOKABLE void boundingBoxClick(float xClick, float yClick, float xDisplay, float yDisplay, float boxWidth, float boxHeight);
+    Q_INVOKABLE void setHudVisible(bool visible);
+    Q_INVOKABLE void toggleHudVisible();
+
+    Q_INVOKABLE void setAIStrike(bool visible);
+    Q_INVOKABLE void setTrackerType(bool visible);
+    Q_INVOKABLE void setSelectMode(bool visible);
+    //FPV
+
     enum PIDTuningTelemetryMode {
         ModeDisabled,
         ModeRateAndAttitude,
@@ -427,6 +444,31 @@ public:
     bool    hasGripper              () const;
     bool haveMRSpeedLimits() const { return _multirotor_speed_limits_available; }
     bool haveFWSpeedLimits() const { return _fixed_wing_airspeed_limits_available; }
+
+    //FPV
+    void currentTrackEngage(int value);
+    void currentTrackerType(int value);
+    int currentTrackEngageValue() const{ return _currentTrackEnagegeValue; }
+    int currentTrackerValue() const{ return _currentTrackerValue; }
+    void getCurrentGstreamSize(float width, float height);
+    void setCancel           (bool armed);
+    void setTrackEngage(bool armed);
+
+    void currentHUD(int value);
+    int currentHUDValue() const{ return _currentHUDValue; }
+    int currentTrackerTypeValue() const{ return _currentTrackerTypeValue; }
+    void currentAIStrike(int value);
+    int currentAIStrikeValue() const{ return _currentAIStrikeValue; }
+
+    bool hudVisible() const{ return _currentHUDValue; }
+    bool aiStrike() const{ return _currentAIStrikeValue; }
+
+    void currentSelectMode(int value);
+    int currentSelectModeValue() const{ return _currentSelectModeValue; }
+
+    void setTrack(bool armed);
+    void setEngage(bool armed);
+    //FPV
 
     // Property accessors
 
@@ -875,7 +917,12 @@ signals:
     void requiresGpsFixChanged          ();
     void haveMRSpeedLimChanged          ();
     void haveFWSpeedLimChanged          ();
-
+    //FPV
+    void hudVisibleChanged(bool visible);
+    void aiStrikeChanged(bool visible);
+    void trackerTypeChanged(bool visible);
+    void selectModeChanged(bool visible);
+    //FPV
     void firmwareVersionChanged         ();
     void firmwareCustomVersionChanged   ();
     void gitHashChanged                 (QString hash);
@@ -1004,6 +1051,19 @@ private:
     int     _id;                    ///< Mavlink system id
     int     _defaultComponentId;
     bool    _offlineEditingVehicle = false; ///< true: This Vehicle is a "disconnected" vehicle for ui use while offline editing
+
+    //FPV
+    int _modelId = -1;
+    int _currentTrackEnagegeValue;
+    int _currentTrackerValue;
+    int _hudOverrideValue = UINT16_MAX;
+
+    int _currentHUDValue;
+    int _currentTrackerTypeValue;
+    int _currentAIStrikeValue;
+    bool _hudVisible = false;
+    int _currentSelectModeValue;
+    //FPV
 
     MAV_AUTOPILOT       _firmwareType;
     MAV_TYPE            _vehicleType;
