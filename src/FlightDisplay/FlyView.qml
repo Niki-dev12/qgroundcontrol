@@ -243,7 +243,7 @@ Item {
             spacing: _compactSpacing
             anchors.left: parent.left
             anchors.top: parent.top
-            anchors.topMargin: Math.max(_u * 0.8, 12)
+            anchors.topMargin: 0  //Math.max(_u * 0.8, 12)
 
             Repeater {
                 model: leftEdge.buttonActions
@@ -290,7 +290,7 @@ Item {
         }
 
         readonly property real _compactSpacing: Math.max(_u * 0.18, 4)
-        readonly property real _slotH: (_edgeBtnSize * _edgeBtnWidthMul) + (_edgeBtnPad * 1.0)
+        readonly property real _slotH: (_edgeBtnSize * _edgeBtnWidthMul)  // + (_edgeBtnPad * 1.0)
 
         Component {
             id: toggleButtonComponent
@@ -381,7 +381,7 @@ Item {
             spacing: _compactSpacing
             anchors.left: parent.left
             anchors.top: parent.top
-            anchors.topMargin: Math.max(_u * 0.8, 12)
+            anchors.topMargin: 0    //Math.max(_u * 0.8, 12)
 
             Repeater {
                 model: rightEdge.buttonActions
