@@ -90,6 +90,7 @@ QGC_LOGGING_CATEGORY(VehicleLog, "VehicleLog")
 #define FPV_CONTROL 191
 #define COMPONENT_ID_USER 25  // av-tagging
 #define COMPONENT_CAM_ID 100  // av-fpv-vision
+#define COMPONENT_GEOPIX_ID 26  // geo pixel component id for tagging
 float gstreamWidth;
 float gstreamHeight;
 //dev end
@@ -4523,7 +4524,7 @@ void Vehicle::boundingBoxClick(float xClick, float yClick,
     const uint32_t p5_bits  = packRecipients_u32(qgcSysId, qgcCompId, 0, 0);
 
     sendMavCommand(
-        COMPONENT_CAM_ID,
+        COMPONENT_GEOPIX_ID,
         MAV_CMD_SPATIAL_USER_2,
         false,
         u32_to_float_bits(p1_bits),
