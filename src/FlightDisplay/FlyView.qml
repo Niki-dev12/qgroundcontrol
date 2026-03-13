@@ -223,6 +223,9 @@ Item {
                     )
                 }
 
+                // Send command once when the delegate is created.
+                // This initializes the backend state so it matches the default UI toggle state.
+                // HUD visibility and AI Strike are excluded because they are driven by vehicle state.
                 Component.onCompleted: {
                     if (buttonConfig.handler !== "hudVisibility"
                             && buttonConfig.command !== _cmdAIStrike
