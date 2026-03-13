@@ -392,12 +392,11 @@ public:
     //FPV
     Q_INVOKABLE void onSidePanelButtonClicked(int command, int param1, bool isToggle, bool enabled);
     Q_INVOKABLE void boundingBoxClick(float xClick, float yClick, float xDisplay, float yDisplay, float boxWidth, float boxHeight);
-    Q_INVOKABLE void setHudVisible(bool visible);
-    Q_INVOKABLE void toggleHudVisible();
+    Q_INVOKABLE void toggleHudVisible(bool visible);
 
-    Q_INVOKABLE void setAIStrike(bool visible);
-    Q_INVOKABLE void setTrackerType(bool visible);
-    Q_INVOKABLE void setSelectMode(bool visible);
+    Q_INVOKABLE void toggleAIStrike();
+    Q_INVOKABLE void toggleTrackerType();
+    Q_INVOKABLE void toggleSelectMode();
     //FPV
 
     enum PIDTuningTelemetryMode {
@@ -446,24 +445,23 @@ public:
     bool haveFWSpeedLimits() const { return _fixed_wing_airspeed_limits_available; }
 
     //FPV
-    void currentTrackEngage(int value);
-    void currentTrackerType(int value);
-    int currentTrackEngageValue() const{ return _currentTrackEnagegeValue; }
+    void setCurrentTrackEngage(int value);
+    void setCurrentTrackerType(int value);
+    int currentTrackEngageValue() const{ return _currentTrackEngageValue; }  
     int currentTrackerValue() const{ return _currentTrackerValue; }
-    void getCurrentGstreamSize(float width, float height);
     void setCancel           (bool armed);
-    void setTrackEngage(bool armed);
+    void toggleTrackEngage(bool armed);
 
-    void currentHUD(int value);
+    void setCurrentHUD(int value);
     int currentHUDValue() const{ return _currentHUDValue; }
     int currentTrackerTypeValue() const{ return _currentTrackerTypeValue; }
-    void currentAIStrike(int value);
+    void setCurrentAIStrike(int value);
     int currentAIStrikeValue() const{ return _currentAIStrikeValue; }
 
     bool hudVisible() const{ return _currentHUDValue; }
     bool aiStrike() const{ return _currentAIStrikeValue; }
 
-    void currentSelectMode(int value);
+    void setCurrentSelectMode(int value);
     int currentSelectModeValue() const{ return _currentSelectModeValue; }
 
     void setTrack(bool armed);
@@ -1054,7 +1052,7 @@ private:
 
     //FPV
     int _modelId = -1;
-    int _currentTrackEnagegeValue;
+    int _currentTrackEngageValue;
     int _currentTrackerValue;
     int _hudOverrideValue = UINT16_MAX;
 

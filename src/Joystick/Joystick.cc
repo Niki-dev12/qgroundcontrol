@@ -796,11 +796,11 @@ void Joystick::startPolling(Vehicle* vehicle)
             (void) disconnect(this, &Joystick::motorInterlock, _activeVehicle, &Vehicle::motorInterlock);
             (void) disconnect(_activeVehicle, &Vehicle::flightModesChanged, this, &Joystick::_flightModesChanged);
             (void) disconnect(this, &Joystick::setCancel, _activeVehicle, &Vehicle::setCancel); //FPV
-            (void) disconnect(this, &Joystick::setTrackEngage, _activeVehicle, &Vehicle::setTrackEngage); //FPV
-            (void) disconnect(this, &Joystick::setHudVisible, _activeVehicle, &Vehicle::setHudVisible); //FPV
-            (void) disconnect(this, &Joystick::setTrackerType, _activeVehicle, &Vehicle::setTrackerType); //FPV
-            (void) disconnect(this, &Joystick::setAIStrike, _activeVehicle, &Vehicle::setAIStrike); //FPV
-            (void) disconnect(this, &Joystick::setSelectMode, _activeVehicle, &Vehicle::setSelectMode); //FPV
+            (void) disconnect(this, &Joystick::toggleTrackEngage, _activeVehicle, &Vehicle::toggleTrackEngage); //FPV
+            (void) disconnect(this, &Joystick::toggleHudVisible, _activeVehicle, &Vehicle::toggleHudVisible); //FPV
+            (void) disconnect(this, &Joystick::toggleTrackerType, _activeVehicle, &Vehicle::toggleTrackerType); //FPV
+            (void) disconnect(this, &Joystick::toggleAIStrike, _activeVehicle, &Vehicle::toggleAIStrike); //FPV
+            (void) disconnect(this, &Joystick::toggleSelectMode, _activeVehicle, &Vehicle::toggleSelectMode); //FPV
             (void) disconnect(this, &Joystick::setTrack, _activeVehicle, &Vehicle::setTrack); //FPV
             (void) disconnect(this, &Joystick::setEngage, _activeVehicle, &Vehicle::setEngage); //FPV
         }
@@ -841,11 +841,11 @@ void Joystick::startPolling(Vehicle* vehicle)
             (void) connect(this, &Joystick::motorInterlock, _activeVehicle, &Vehicle::motorInterlock);
             (void) connect(_activeVehicle, &Vehicle::flightModesChanged, this, &Joystick::_flightModesChanged);
             (void) connect(this, &Joystick::setCancel,         _activeVehicle, &Vehicle::setCancel); //FPV
-            (void) connect(this, &Joystick::setTrackEngage,    _activeVehicle, &Vehicle::setTrackEngage); //FPV
-            (void) connect(this, &Joystick::setHudVisible,    _activeVehicle, &Vehicle::setHudVisible); //FPV
-            (void) connect(this, &Joystick::setTrackerType, _activeVehicle, &Vehicle::setTrackerType); //FPV
-            (void) connect(this, &Joystick::setAIStrike, _activeVehicle, &Vehicle::setAIStrike); //FPV
-            (void) connect(this, &Joystick::setSelectMode, _activeVehicle, &Vehicle::setSelectMode); //FPV
+            (void) connect(this, &Joystick::toggleTrackEngage,    _activeVehicle, &Vehicle::toggleTrackEngage); //FPV
+            (void) connect(this, &Joystick::toggleHudVisible,    _activeVehicle, &Vehicle::toggleHudVisible); //FPV
+            (void) connect(this, &Joystick::toggleTrackerType, _activeVehicle, &Vehicle::toggleTrackerType); //FPV
+            (void) connect(this, &Joystick::toggleAIStrike, _activeVehicle, &Vehicle::toggleAIStrike); //FPV
+            (void) connect(this, &Joystick::toggleSelectMode, _activeVehicle, &Vehicle::toggleSelectMode); //FPV
             (void) connect(this, &Joystick::setTrack, _activeVehicle, &Vehicle::setTrack); //FPV
             (void) connect(this, &Joystick::setEngage, _activeVehicle, &Vehicle::setEngage); //FPV
         }
@@ -880,11 +880,11 @@ void Joystick::stopPolling()
         (void) disconnect(this, &Joystick::motorInterlock, _activeVehicle, &Vehicle::motorInterlock);
         (void) disconnect(_activeVehicle, &Vehicle::flightModesChanged, this, &Joystick::_flightModesChanged);
         (void) disconnect(this, &Joystick::setCancel, _activeVehicle, &Vehicle::setCancel); //FPV
-        (void) disconnect(this, &Joystick::setTrackEngage, _activeVehicle, &Vehicle::setTrackEngage); //FPV
-        (void) disconnect(this, &Joystick::setHudVisible, _activeVehicle, &Vehicle::setHudVisible); //FPV
-        (void) disconnect(this, &Joystick::setTrackerType, _activeVehicle, &Vehicle::setTrackerType); //FPV
-        (void) disconnect(this, &Joystick::setAIStrike, _activeVehicle, &Vehicle::setAIStrike); //FPV
-        (void) disconnect(this, &Joystick::setSelectMode, _activeVehicle, &Vehicle::setSelectMode); //FPV
+        (void) disconnect(this, &Joystick::toggleTrackEngage, _activeVehicle, &Vehicle::toggleTrackEngage); //FPV
+        (void) disconnect(this, &Joystick::toggleHudVisible, _activeVehicle, &Vehicle::toggleHudVisible); //FPV
+        (void) disconnect(this, &Joystick::toggleTrackerType, _activeVehicle, &Vehicle::toggleTrackerType); //FPV
+        (void) disconnect(this, &Joystick::toggleAIStrike, _activeVehicle, &Vehicle::toggleAIStrike); //FPV
+        (void) disconnect(this, &Joystick::toggleSelectMode, _activeVehicle, &Vehicle::toggleSelectMode); //FPV
         (void) disconnect(this, &Joystick::setTrack, _activeVehicle, &Vehicle::setTrack); //FPV
         (void) disconnect(this, &Joystick::setEngage, _activeVehicle, &Vehicle::setEngage); //FPV
         _activeVehicle = nullptr;
@@ -1256,15 +1256,15 @@ void Joystick::_executeButtonAction(const QString &action, bool buttonDown)
     } else if(action == _buttonActionCancel){
         if (buttonDown) emit setCancel(true); 
     }else if(action == _buttonActionTrackEngage){
-        if (buttonDown) emit setTrackEngage(true);
+        if (buttonDown) emit toggleTrackEngage(true);
     }else if(action == _buttonActionHUD){
-        if (buttonDown) emit setHudVisible(true);
+        if (buttonDown) emit toggleHudVisible(true);
     }else if(action == _buttonActionTrackerType){
-        if (buttonDown) emit setTrackerType(true);
+        if (buttonDown) emit toggleTrackerType(true);
     }else if(action == _buttonActionAIStrike){
-        if (buttonDown) emit setAIStrike(true);
+        if (buttonDown) emit toggleAIStrike(true);
     }else if(action == _buttonActionSelectMode){
-        if (buttonDown) emit setSelectMode(true);
+        if (buttonDown) emit toggleSelectMode(true);
     }else if(action == _buttonActionTrack){
         if (buttonDown) emit setTrack(true);
     }else if(action == _buttonActionEngage){

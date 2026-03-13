@@ -160,14 +160,12 @@ Item {
         }
         onPositionChanged: (mouse) => {
             //FPV
-            onPositionChanged: {
-                const dx = mouse.x - pressPos.x
-                const dy = mouse.y - pressPos.y
-                if (Math.sqrt(dx*dx + dy*dy) > dragThreshold) {
-                    isDragging = true
-                    currentX = mouse.x
-                    currentY = mouse.y
-                }
+            const dx = mouse.x - pressPos.x
+            const dy = mouse.y - pressPos.y
+            if (Math.sqrt(dx * dx + dy * dy) > dragThreshold) {
+                isDragging = true
+                currentX = mouse.x
+                currentY = mouse.y
             }
             //FPV
             //on move, update the width of rectangle

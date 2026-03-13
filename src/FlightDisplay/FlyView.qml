@@ -68,28 +68,44 @@ Item {
     readonly property real _layoutSpacing: ScreenTools.defaultFontPixelWidth / 2
 
     //FPV
+
+    // FPV MAVLink command IDs
+    readonly property int _cmdAIStrike:      31055
+    readonly property int _cmdVisualNav:     31056
+    readonly property int _cmdAutoRec:       31057
+    readonly property int _cmdDatasetAcq:    31058
+    readonly property int _cmdHudVisibility: 31059
+
+    readonly property int _cmdTrackerType:   31053
+    readonly property int _cmdSelectMode:    31054
+    readonly property int _cmdEngage:        31052
+    readonly property int _cmdTrack:         31051
+    readonly property int _cmdCancel:        31050
+
+    readonly property real _compactSpacingScale: 0.18
+    readonly property real _compactSpacingMin:   4
     // Base unit that follows QGC scaling (DPI/font scaling)
-    readonly property real _u: ScreenTools.defaultFontPixelHeight
+    readonly property real _scaleUnit: ScreenTools.defaultFontPixelHeight
 
     // Strip width scales with UI
-    readonly property real _edgeStripWidth: Math.max(_u * 2.6, 40)
+    readonly property real _edgeStripWidth: Math.max(_scaleUnit * 2.6, 40)
 
     // Button geometry scales with UI
-    readonly property real _edgeBtnSize:    Math.max(_u * 2.2, 36)
+    readonly property real _edgeBtnSize:    Math.max(_scaleUnit * 2.2, 36)
     readonly property real _edgeBtnWidthMul: 2.8
 
-    readonly property real _edgeBtnPad:     Math.max(_u * 0.10, 2)
-    readonly property real _edgeBtnFont:    Math.max(_u * 1.05, 14)
+    readonly property real _edgeBtnPad:     Math.max(_scaleUnit * 0.10, 2)
+    readonly property real _edgeBtnFont:    Math.max(_scaleUnit * 1.05, 14)
 
     // Spacing & offsets scale with UI
-    readonly property real _edgeSpacing:    Math.max(_u * 0.55, 10)
-    readonly property real _edgeXInset:     Math.max(_u * 1.2, 20)
-    readonly property real _edgeYInset:     Math.max(_u * 1.2, 20)
-    readonly property real _edgeRotateShiftLeft:  Math.max(_u * 1.2, 20)
-    readonly property real _edgeRotateShiftRight: Math.max(_u * 0.6, 12)
+    readonly property real _edgeSpacing:    Math.max(_scaleUnit * 0.55, 10)
+    readonly property real _edgeXInset:     Math.max(_scaleUnit * 1.2, 20)
+    readonly property real _edgeYInset:     Math.max(_scaleUnit * 1.2, 20)
+    readonly property real _edgeRotateShiftLeft:  Math.max(_scaleUnit * 1.2, 20)
+    readonly property real _edgeRotateShiftRight: Math.max(_scaleUnit * 0.6, 12)
 
-    readonly property real _edgeTopMarginLeft:  Math.max(_u * 1.2, 20)
-    readonly property real _edgeTopMarginRight: Math.max(_u * 0.8, 16)
+    readonly property real _edgeTopMarginLeft:  Math.max(_scaleUnit * 1.2, 20)
+    readonly property real _edgeTopMarginRight: Math.max(_scaleUnit * 0.8, 16)
     readonly property real _edgeSlotHeight: _edgeBtnSize + _edgeSpacing
 
     readonly property int uiLayout: QGroundControl.settingsManager.appSettings.uiLayout.rawValue
@@ -132,24 +148,24 @@ Item {
         clip: false
 
         property var buttonActions: [
-            { label: "AI Strike",   command: 31055, param1: 0, isToggle: true },
-            { label: "Visual Nav",  command: 31056, param1: 0, isToggle: true },
-            { label: "Auto Rec",    command: 31057, param1: 0, isToggle: true },
-            { label: "Dataset Acq", command: 31058, param1: 0, isToggle: true },
-            { label: "Show HUD",    command: 31059, param1: 1, isToggle: true, handler: "hudVisibility" }
+            { label: "AI Strike",   command: _cmdAIStrike, param1: 0, isToggle: true },
+            { label: "Visual Nav",  command: _cmdVisualNav, param1: 0, isToggle: true },
+            { label: "Auto Rec",    command: _cmdAutoRec, param1: 0, isToggle: true },
+            { label: "Dataset Acq", command: _cmdDatasetAcq, param1: 0, isToggle: true },
+            { label: "Show HUD",    command: _cmdHudVisibility, param1: 1, isToggle: true, handler: "hudVisibility" }
         ]
 
         function sendCommand(command, param1, isToggle, enabled, handler) {
-            const vehicle = QGroundControl.multiVehicleManager.activeVehicle
-            if (!vehicle) return
-            vehicle.onSidePanelButtonClicked(command, param1, isToggle, enabled)
+            if (!_root._activeVehicle)
+                return
 
-            if (handler === "hudVisibility") {
-                vehicle.toggleHudVisibility(enabled)
-            }
+            _root._activeVehicle.onSidePanelButtonClicked(command, param1, isToggle, enabled)
+
+            if (handler === "hudVisibility")
+                _root._activeVehicle.toggleHudVisibility(enabled)
         }
 
-        readonly property real _compactSpacing: Math.max(_u * 0.18, 4)
+        readonly property real _compactSpacing: Math.max(_scaleUnit * _compactSpacingScale, _compactSpacingMin)
         // slot height must match the rotated height === original width
         // readonly property real _slotH: (_edgeBtnSize * _edgeBtnWidthMul) + (_edgeBtnPad * 1.0)
         readonly property real _slotH: (_edgeBtnSize * _edgeBtnWidthMul)
@@ -170,35 +186,47 @@ Item {
                     angle: 270
                 }
 
-                property var v: QGroundControl.multiVehicleManager.activeVehicle
+                function _checkedState() {
+                    if (!_root._activeVehicle)
+                        return false
 
-                checked: buttonConfig.handler === "hudVisibility"
-                    ? (v ? v.hudVisible : false)
-                    : (buttonConfig.command === 31055 && v
-                            ? v.aiStrike
-                            : (buttonConfig.param1 === 1))
+                    if (buttonConfig.handler === "hudVisibility")
+                        return _root._activeVehicle.hudVisible
+
+                    if (buttonConfig.command === _cmdAIStrike)
+                        return _root._activeVehicle.aiStrike
+
+                    return buttonConfig.param1 === 1
+                }
+
+                checked: _checkedState()
 
                 text: buttonConfig.handler === "hudVisibility"
                         ? (checked ? "Hide HUD" : "Show HUD")
                         : buttonConfig.label
 
                 onClicked: {
-                    if (v && buttonConfig.handler === "hudVisibility") {
-                        v.setHudVisible(!v.hudVisible)
+                    if (_root._activeVehicle && buttonConfig.handler === "hudVisibility") {
+                        _root._activeVehicle.toggleHudVisible(!_root._activeVehicle.hudVisible)
                         return
                     }
-                    if (v && buttonConfig.command === 31055) { // AI Strike
-                        v.setAIStrike(!v.aiStrike)
+                    if (_root._activeVehicle && buttonConfig.command === _cmdAIStrike) {
+                        _root._activeVehicle.toggleAIStrike(!_root._activeVehicle.aiStrike)
                         return
                     }
-                    leftEdge.sendCommand(buttonConfig.command,buttonConfig.param1 || 0,true,checked,buttonConfig.handler)
+                    leftEdge.sendCommand(
+                        buttonConfig.command,
+                        buttonConfig.param1 || 0,
+                        true,
+                        checked,
+                        buttonConfig.handler
+                    )
                 }
 
                 Component.onCompleted: {
                     if (buttonConfig.handler !== "hudVisibility"
-                                && buttonConfig.command !== 31055
-                                && checked) {
-
+                            && buttonConfig.command !== _cmdAIStrike
+                            && checked) {
                         leftEdge.sendCommand(
                             buttonConfig.command,
                             buttonConfig.param1 || 0,
@@ -243,7 +271,7 @@ Item {
             spacing: _compactSpacing
             anchors.left: parent.left
             anchors.top: parent.top
-            anchors.topMargin: 0  //Math.max(_u * 0.8, 12)
+            anchors.topMargin: 0  //Math.max(_scaleUnit * 0.8, 12)
 
             Repeater {
                 model: leftEdge.buttonActions
@@ -277,19 +305,19 @@ Item {
         clip: false
 
         property var buttonActions: [
-            { label: "Tracker Type", command: 31053, param1: 0, isToggle: true },
-            { label: "Select Mode",  command: 31054, param1: 1, isToggle: true },
-            { label: "Engage",       command: 31052 },
-            { label: "Track",        command: 31051 },
-            { label: "Cancel",       command: 31050 }
+            { label: "Tracker Type", command: _cmdTrackerType, param1: 0, isToggle: true },
+            { label: "Select Mode",  command: _cmdSelectMode, param1: 1, isToggle: true },
+            { label: "Engage",       command: _cmdEngage },
+            { label: "Track",        command: _cmdTrack },
+            { label: "Cancel",       command: _cmdCancel }
         ]
 
         function sendCommand(command, param1, isToggle, enabled) {
-            const v = QGroundControl.multiVehicleManager.activeVehicle
-            if (v) v.onSidePanelButtonClicked(command, param1, isToggle, enabled)
+            if (_root._activeVehicle)
+                _root._activeVehicle.onSidePanelButtonClicked(command, param1, isToggle, enabled)
         }
 
-        readonly property real _compactSpacing: Math.max(_u * 0.18, 4)
+        readonly property real _compactSpacing: Math.max(_scaleUnit * _compactSpacingScale, _compactSpacingMin)
         readonly property real _slotH: (_edgeBtnSize * _edgeBtnWidthMul)  // + (_edgeBtnPad * 1.0)
 
         Component {
@@ -310,21 +338,28 @@ Item {
                     angle: 90
                 }
 
-                property var v: QGroundControl.multiVehicleManager.activeVehicle
+                function _checkedState() {
+                    if (!_root._activeVehicle)
+                        return false
 
-                checked: (buttonConfig.command === 31053 && v)
-                    ? v.currentTrackerTypeValue
-                    : (buttonConfig.command === 31054 && v)
-                        ? v.currentSelectModeValue
-                        : (buttonConfig.param1 === 1)
+                    if (buttonConfig.command === _cmdTrackerType)
+                        return _root._activeVehicle.currentTrackerTypeValue
+
+                    if (buttonConfig.command === _cmdSelectMode)
+                        return _root._activeVehicle.currentSelectModeValue
+
+                    return buttonConfig.param1 === 1
+                }
+
+                checked: _checkedState()
 
                 onClicked: {
-                    if (v && buttonConfig.command === 31053) {
-                        v.setTrackerType(!v.currentTrackerTypeValue)
+                    if (_root._activeVehicle && buttonConfig.command === _cmdTrackerType) {
+                        _root._activeVehicle.toggleTrackerType(!_root._activeVehicle.currentTrackerTypeValue)
                         return
                     }
-                    if (v && buttonConfig.command === 31054) {
-                        v.setSelectMode(!v.currentSelectModeValue)
+                    if (_root._activeVehicle && buttonConfig.command === _cmdSelectMode) {
+                        _root._activeVehicle.toggleSelectMode(!_root._activeVehicle.currentSelectModeValue)
                         return
                     }
                     rightEdge.sendCommand(
@@ -335,10 +370,12 @@ Item {
                     )
                 }
 
-                // Prevent double-send for 31053
                 onCheckedChanged: {
-                    if (buttonConfig.command === 31053) return
-                    if (buttonConfig.command === 31054) return
+                    if (buttonConfig.command === _cmdTrackerType)
+                        return
+                    if (buttonConfig.command === _cmdSelectMode)
+                        return
+
                     rightEdge.sendCommand(
                         buttonConfig.command,
                         buttonConfig.param1 || 0,
@@ -381,7 +418,7 @@ Item {
             spacing: _compactSpacing
             anchors.left: parent.left
             anchors.top: parent.top
-            anchors.topMargin: 0    //Math.max(_u * 0.8, 12)
+            anchors.topMargin: 0    //Math.max(_scaleUnit * 0.8, 12)
 
             Repeater {
                 model: rightEdge.buttonActions

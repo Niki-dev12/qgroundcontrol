@@ -229,11 +229,11 @@ signals:
     void unknownAction(const QString &action);
     //FPV
     void setCancel                   (bool arm);
-    void setTrackEngage              (bool arm);
-    void setHudVisible               (bool visible);
-    void setTrackerType              (bool type);
-    void setAIStrike                 (bool ai);
-    void setSelectMode               (bool selectmode);
+    void toggleTrackEngage              (bool arm);
+    void toggleHudVisible               (bool visible);
+    void toggleTrackerType              (bool type);
+    void toggleAIStrike                 (bool ai);
+    void toggleSelectMode               (bool selectmode);
     void setEngage                   (bool arm);
     void setTrack                    (bool arm);
     //FPV
