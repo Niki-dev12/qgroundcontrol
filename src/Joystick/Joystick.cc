@@ -795,6 +795,14 @@ void Joystick::startPolling(Vehicle* vehicle)
             (void) disconnect(this, &Joystick::landingGearRetract, _activeVehicle, &Vehicle::landingGearRetract);
             (void) disconnect(this, &Joystick::motorInterlock, _activeVehicle, &Vehicle::motorInterlock);
             (void) disconnect(_activeVehicle, &Vehicle::flightModesChanged, this, &Joystick::_flightModesChanged);
+            (void) disconnect(this, &Joystick::setCancel, _activeVehicle, &Vehicle::setCancel); //FPV
+            (void) disconnect(this, &Joystick::toggleTrackEngage, _activeVehicle, &Vehicle::toggleTrackEngage); //FPV
+            (void) disconnect(this, &Joystick::toggleHudVisible, _activeVehicle, &Vehicle::toggleHudVisible); //FPV
+            (void) disconnect(this, &Joystick::toggleTrackerType, _activeVehicle, &Vehicle::toggleTrackerType); //FPV
+            (void) disconnect(this, &Joystick::toggleAIStrike, _activeVehicle, &Vehicle::toggleAIStrike); //FPV
+            (void) disconnect(this, &Joystick::toggleSelectMode, _activeVehicle, &Vehicle::toggleSelectMode); //FPV
+            (void) disconnect(this, &Joystick::setTrack, _activeVehicle, &Vehicle::setTrack); //FPV
+            (void) disconnect(this, &Joystick::setEngage, _activeVehicle, &Vehicle::setEngage); //FPV
         }
 
         _activeVehicle = vehicle;
@@ -832,6 +840,14 @@ void Joystick::startPolling(Vehicle* vehicle)
             (void) connect(this, &Joystick::landingGearRetract, _activeVehicle, &Vehicle::landingGearRetract);
             (void) connect(this, &Joystick::motorInterlock, _activeVehicle, &Vehicle::motorInterlock);
             (void) connect(_activeVehicle, &Vehicle::flightModesChanged, this, &Joystick::_flightModesChanged);
+            (void) connect(this, &Joystick::setCancel,         _activeVehicle, &Vehicle::setCancel); //FPV
+            (void) connect(this, &Joystick::toggleTrackEngage,    _activeVehicle, &Vehicle::toggleTrackEngage); //FPV
+            (void) connect(this, &Joystick::toggleHudVisible,    _activeVehicle, &Vehicle::toggleHudVisible); //FPV
+            (void) connect(this, &Joystick::toggleTrackerType, _activeVehicle, &Vehicle::toggleTrackerType); //FPV
+            (void) connect(this, &Joystick::toggleAIStrike, _activeVehicle, &Vehicle::toggleAIStrike); //FPV
+            (void) connect(this, &Joystick::toggleSelectMode, _activeVehicle, &Vehicle::toggleSelectMode); //FPV
+            (void) connect(this, &Joystick::setTrack, _activeVehicle, &Vehicle::setTrack); //FPV
+            (void) connect(this, &Joystick::setEngage, _activeVehicle, &Vehicle::setEngage); //FPV
         }
     }
 
@@ -863,6 +879,14 @@ void Joystick::stopPolling()
         (void) disconnect(this, &Joystick::landingGearRetract, _activeVehicle, &Vehicle::landingGearRetract);
         (void) disconnect(this, &Joystick::motorInterlock, _activeVehicle, &Vehicle::motorInterlock);
         (void) disconnect(_activeVehicle, &Vehicle::flightModesChanged, this, &Joystick::_flightModesChanged);
+        (void) disconnect(this, &Joystick::setCancel, _activeVehicle, &Vehicle::setCancel); //FPV
+        (void) disconnect(this, &Joystick::toggleTrackEngage, _activeVehicle, &Vehicle::toggleTrackEngage); //FPV
+        (void) disconnect(this, &Joystick::toggleHudVisible, _activeVehicle, &Vehicle::toggleHudVisible); //FPV
+        (void) disconnect(this, &Joystick::toggleTrackerType, _activeVehicle, &Vehicle::toggleTrackerType); //FPV
+        (void) disconnect(this, &Joystick::toggleAIStrike, _activeVehicle, &Vehicle::toggleAIStrike); //FPV
+        (void) disconnect(this, &Joystick::toggleSelectMode, _activeVehicle, &Vehicle::toggleSelectMode); //FPV
+        (void) disconnect(this, &Joystick::setTrack, _activeVehicle, &Vehicle::setTrack); //FPV
+        (void) disconnect(this, &Joystick::setEngage, _activeVehicle, &Vehicle::setEngage); //FPV
         _activeVehicle = nullptr;
     }
 
@@ -1228,6 +1252,24 @@ void Joystick::_executeButtonAction(const QString &action, bool buttonDown)
         if (buttonDown) {
             emit motorInterlock(false);
         }
+    //FPV
+    } else if(action == _buttonActionCancel){
+        if (buttonDown) emit setCancel(true); 
+    }else if(action == _buttonActionTrackEngage){
+        if (buttonDown) emit toggleTrackEngage(true);
+    }else if(action == _buttonActionHUD){
+        if (buttonDown) emit toggleHudVisible(true);
+    }else if(action == _buttonActionTrackerType){
+        if (buttonDown) emit toggleTrackerType(true);
+    }else if(action == _buttonActionAIStrike){
+        if (buttonDown) emit toggleAIStrike(true);
+    }else if(action == _buttonActionSelectMode){
+        if (buttonDown) emit toggleSelectMode(true);
+    }else if(action == _buttonActionTrack){
+        if (buttonDown) emit setTrack(true);
+    }else if(action == _buttonActionEngage){
+        if (buttonDown) emit setEngage(true);
+    //FPV
     } else {
         if (buttonDown && _activeVehicle) {
             emit unknownAction(action);
@@ -1318,6 +1360,15 @@ void Joystick::_buildActionList(Vehicle *activeVehicle)
     _assignableButtonActions->append(new AssignableButtonAction(_buttonActionGripperRelease));
     _assignableButtonActions->append(new AssignableButtonAction(_buttonActionLandingGearDeploy));
     _assignableButtonActions->append(new AssignableButtonAction(_buttonActionLandingGearRetract));
+    _assignableButtonActions->append(new AssignableButtonAction(_buttonActionCancel)); //FPV
+    _assignableButtonActions->append(new AssignableButtonAction(_buttonActionTrackEngage)); //FPV
+    _assignableButtonActions->append(new AssignableButtonAction(_buttonActionHUD)); //FPV
+    _assignableButtonActions->append(new AssignableButtonAction(_buttonActionTrackerType)); //FPV
+    _assignableButtonActions->append(new AssignableButtonAction(_buttonActionAIStrike)); //FPV
+    _assignableButtonActions->append(new AssignableButtonAction(_buttonActionSelectMode)); //FPV
+    _assignableButtonActions->append(new AssignableButtonAction(_buttonActionTrack)); //FPV
+    _assignableButtonActions->append(new AssignableButtonAction(_buttonActionEngage)); //FPV
+
 #ifndef QGC_NO_ARDUPILOT_DIALECT
     _assignableButtonActions->append(new AssignableButtonAction(_buttonActionMotorInterlockEnable));
     _assignableButtonActions->append(new AssignableButtonAction(_buttonActionMotorInterlockDisable));

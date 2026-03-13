@@ -59,6 +59,9 @@
 #include "MavlinkSettings.h"
 #include "APM.h"
 
+#include <iostream> //FPV
+#include <sstream> //FPV
+
 #ifdef QGC_UTM_ADAPTER
 #include "UTMSPVehicle.h"
 #include "UTMSPManager.h"
@@ -68,6 +71,7 @@
 #endif
 
 #include <QtCore/QDateTime>
+#include <QDebug>
 
 QGC_LOGGING_CATEGORY(VehicleLog, "VehicleLog")
 
@@ -76,6 +80,14 @@ QGC_LOGGING_CATEGORY(VehicleLog, "VehicleLog")
 #define DEFAULT_LON -120.083923f
 #define SET_HOME_TERRAIN_ALT_MAX 10000
 #define SET_HOME_TERRAIN_ALT_MIN -500
+
+//FPV
+#define FPV_CONTROL 191
+#define COMPONENT_ID_USER 25  // av-tagging
+#define COMPONENT_CAM_ID 100  // av-fpv-vision
+float gstreamWidth;
+float gstreamHeight;
+//FPV
 
 // After a second GCS has requested control and we have given it permission to takeover, we will remove takeover permission automatically after this timeout
 // If the second GCS didn't get control 
@@ -1304,6 +1316,236 @@ void Vehicle::setEventsMetadata(uint8_t compid, const QString& metadataJsonFileN
                    MAV_CMD_RUN_PREARM_CHECKS,
                    false);
 }
+
+//FPV
+void Vehicle::setCurrentTrackEngage(int value){
+    _currentTrackEngageValue = value;
+}
+
+void Vehicle::setCurrentTrackerType(int value){
+    _currentTrackerValue = value;
+    _currentTrackerTypeValue = value;
+}
+
+void Vehicle::setCurrentHUD(int value){
+    _currentHUDValue = value;
+}
+
+void Vehicle::setCurrentAIStrike(int value){
+    _currentAIStrikeValue = value;
+}
+
+void Vehicle::setCurrentSelectMode(int value){
+    _currentSelectModeValue = value;
+
+}
+
+void Vehicle::toggleTrackEngage(bool armed)
+{
+    int current = currentTrackEngageValue();
+    int paramTE = (current == 31051) ? 31052 :
+                  (current == 31052) ? 31051 :
+                  31052; // default fallback
+
+    setCurrentTrackEngage(paramTE);
+
+    sendMavCommand(FPV_CONTROL,
+                    static_cast<MAV_CMD>(paramTE), 
+                    true, 
+                    1, 0, 0, 0, 0, 0, 0);
+}
+
+void Vehicle::setCancel(bool armed)
+{
+    // float p1 = based on armed value.
+    sendMavCommand( FPV_CONTROL,
+                        static_cast<MAV_CMD>(31050), 
+                        true, 
+                        1, 
+                        0,
+                        0, 
+                        0, 
+                        0, 
+                        0, 
+                        0);
+}
+
+void Vehicle::onSidePanelButtonClicked(int command, int param1, bool isToggle, bool enabled)
+{
+    if (command == 31059) {
+        toggleHudVisible(enabled);
+        return;
+    }
+
+    float p1 = isToggle ? (enabled ? 1.0f : 0.0f) : static_cast<float>(param1);
+    if(command == 31053 || command == 31054){
+        p1=p1+1;
+    }
+
+    if (command == 31055) {
+        setCurrentAIStrike(enabled ? 1 : 0);
+    }
+
+
+    if(command == 31051 || command == 31052){
+        setCurrentTrackEngage(command);
+    }
+
+    if(command == 31053){
+        setCurrentTrackerType(p1);
+    }
+
+    sendMavCommand(
+        FPV_CONTROL,
+        static_cast<MAV_CMD>(command),
+        true,
+        p1,                          // param1
+        0, 0, 0, 0, 0,               // param2–param6
+        0                            // param7
+    );
+}
+
+
+
+// Developed
+long long getFormattedTimeAsInt() {
+    // Get current time as time_t object
+    auto now = std::chrono::system_clock::now();
+    std::time_t now_c = std::chrono::system_clock::to_time_t(now);
+    std::tm* now_tm = std::localtime(&now_c);
+    std::stringstream ss;
+    ss << std::put_time(now_tm, "%H%M%S");
+    return std::stoll(ss.str());
+}
+
+void Vehicle::boundingBoxClick(float xClick, float yClick, float xDisplay, float yDisplay, float boxWidth, float boxHeight)
+{
+    if (xDisplay <= 0.0f || yDisplay <= 0.0f || gstreamWidth <= 0.0f || gstreamHeight <= 0.0f) {
+        qWarning() << "Invalid dimensions provided.";
+        return;
+    }
+    // Stream aspect ratio and display aspect
+    const float streamAspect = gstreamWidth / gstreamHeight;
+    const float displayAspect = xDisplay / yDisplay;
+
+    float scale = std::min(xDisplay / gstreamWidth, yDisplay / gstreamHeight);
+    float renderWidth = gstreamWidth * scale;
+    float renderHeight = gstreamHeight * scale;
+    float offsetX = (xDisplay - renderWidth) / 2.0f;
+    float offsetY = (yDisplay - renderHeight) / 2.0f;
+
+    // Normalize click position
+    xClick = std::clamp((xClick - offsetX) / renderWidth, 0.0f, 1.0f);
+    yClick = std::clamp((yClick - offsetY) / renderHeight, 0.0f, 1.0f);
+
+    // Normalize box size
+    if (boxWidth > 0.0f && boxHeight > 0.0f) {
+        boxWidth /= renderWidth;
+        boxHeight /= renderHeight;
+    }
+    
+        sendMavCommand(
+            COMPONENT_CAM_ID, MAV_CMD_USER_3, false,
+            xClick, yClick, boxWidth, boxHeight, -1, 0, 0
+        );  
+}
+
+void Vehicle::setTrack(bool armed)
+{
+    sendMavCommand(FPV_CONTROL,
+                    static_cast<MAV_CMD>(31051), 
+                    true, 
+                    1, 0, 0, 0, 0, 0, 0);
+}
+
+void Vehicle::setEngage(bool armed)
+{
+    sendMavCommand(FPV_CONTROL,
+                    static_cast<MAV_CMD>(31052), 
+                    true, 
+                    1, 0, 0, 0, 0, 0, 0);
+}
+
+// void Vehicle::toggleHudVisible()
+// {
+//     toggleHudVisible(!_hudVisible);
+// }
+
+void Vehicle::toggleHudVisible(bool visible)
+{
+    int current = currentHUDValue();
+    int paramTE = (current == 0) ? 1 :
+                  (current == 1) ? 0 :
+                  1;
+
+    setCurrentHUD(paramTE);
+    _hudVisible = (paramTE == 1);
+    emit hudVisibleChanged(_hudVisible);
+
+    sendMavCommand(
+        FPV_CONTROL, // target component ID
+        static_cast<MAV_CMD>(31059),
+        true,
+        static_cast<float>(paramTE),                     // param1
+        0, 0, 0, 0, 0,               // param2–param6
+        0                            // param7
+    );
+}
+
+void Vehicle::toggleTrackerType()
+{
+    int current = currentTrackerTypeValue();
+    int paramTE = (current == 0) ? 1 :
+                  (current == 1) ? 0 :
+                  1;
+
+    setCurrentTrackerType(paramTE);
+    emit trackerTypeChanged(paramTE == 1);
+
+    sendMavCommand(
+        FPV_CONTROL,
+        static_cast<MAV_CMD>(31053),
+        true,
+        static_cast<float>(paramTE + 1),
+        0, 0, 0, 0, 0, 0);
+}
+
+void Vehicle::toggleAIStrike()
+{
+    int current = currentAIStrikeValue();
+    int paramTE = (current == 0) ? 1 :
+                  (current == 1) ? 0 :
+                  1;
+
+    setCurrentAIStrike(paramTE);
+    emit aiStrikeChanged(paramTE == 1);
+
+    sendMavCommand(
+        FPV_CONTROL,
+        static_cast<MAV_CMD>(31055),
+        true,
+        static_cast<float>(paramTE),
+        0, 0, 0, 0, 0, 0);
+}
+
+void Vehicle::toggleSelectMode()
+{
+    int current = currentSelectModeValue();
+    int paramTE = (current == 0) ? 1 :
+                  (current == 1) ? 0 :
+                  1;
+
+    setCurrentSelectMode(paramTE);
+    emit selectModeChanged(paramTE == 1);
+
+    sendMavCommand(
+        FPV_CONTROL,
+        static_cast<MAV_CMD>(31054),
+        true,
+        static_cast<float>(paramTE + 1),
+        0, 0, 0, 0, 0, 0);
+}
+//FPV
 
 void Vehicle::setActuatorsMetadata([[maybe_unused]] uint8_t compid,
                                    const QString &metadataJsonFileName)
@@ -2620,6 +2862,10 @@ bool Vehicle::_commandCanBeDuplicated(MAV_CMD command)
     // MOTOR_TEST in ardusub is a case where we need a constant stream of commands so it doesn't time out.
     switch (command) {
     case MAV_CMD_DO_MOTOR_TEST:
+    case MAV_CMD_USER_1: //FPV
+    case MAV_CMD_USER_2: //FPV
+    case MAV_CMD_USER_3: //FPV
+    case MAV_CMD_USER_4: //FPV
         return true;
     case MAV_CMD_SET_MESSAGE_INTERVAL:
         return true;
