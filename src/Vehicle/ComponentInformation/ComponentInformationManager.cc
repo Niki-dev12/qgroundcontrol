@@ -32,6 +32,8 @@
 
 QGC_LOGGING_CATEGORY(ComponentInformationManagerLog, "qgc.vehicle.components.componentinformationmanager")
 
+#define VEHICLE_IDENTIFICATION 39
+
 void ComponentInformationManager::_ensureCompInfoSet(uint8_t compId)
 {
     if (!_compInfoMap.contains(compId)) {
@@ -90,8 +92,8 @@ void ComponentInformationManager::requestAllComponentInformation(RequestAllCompl
     _pendingGeneralCompIds.clear();
     _pendingGeneralCompIds.append(MAV_COMP_ID_AUTOPILOT1);
 
-    // Add your custom component here
-    _pendingGeneralCompIds.append(100);
+    // Component metadata
+    _pendingGeneralCompIds.append(VEHICLE_IDENTIFICATION);
 
     for (uint8_t compId : _pendingGeneralCompIds) {
         _ensureCompInfoSet(compId);
@@ -747,7 +749,7 @@ void RequestMetaDataTypeStateMachine::_stateRequestComplete(StateMachine* stateM
                          << "softwareVersion:" << softwareVersion;
 
                 // Only use your custom component metadata for auto-layout detection
-                if (compInfo->compId == 100 && !modelName.isEmpty()) {
+                if (compInfo->compId == VEHICLE_IDENTIFICATION && !modelName.isEmpty()) {
                     compInfo->vehicle->setComponentModelName(modelName);
 
                     qDebug() << "Vehicle componentModelName updated from metadata:"
