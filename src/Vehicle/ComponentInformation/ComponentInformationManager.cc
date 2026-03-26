@@ -417,10 +417,10 @@ void RequestMetaDataTypeStateMachine::_stateRequestCompInfoDeprecated(StateMachi
         } else {
             qCDebug(ComponentInformationManagerLog) << "Requesting component information" << requestMachine->typeToString();
             qDebug()
-    << "Requesting deprecated component information"
-    << "compId:" << requestMachine->_compInfo->compId
-    << "type:" << requestMachine->typeToString()
-    << "msgId:" << MAVLINK_MSG_ID_COMPONENT_INFORMATION;
+                << "Requesting deprecated component information"
+                << "compId:" << requestMachine->_compInfo->compId
+                << "type:" << requestMachine->typeToString()
+                << "msgId:" << MAVLINK_MSG_ID_COMPONENT_INFORMATION;
             vehicle->requestMessage(
                         _requestMessageResultHandlerDeprecated,
                         stateMachine,
@@ -437,22 +437,47 @@ QString RequestMetaDataTypeStateMachine::_downloadCompleteJsonWorker(const QStri
 {
     QString outputFileName = fileName;
 
+    //FPV
+    qDebug() << "_downloadCompleteJsonWorker input fileName:" << fileName
+             << "cacheTag:" << _currentCacheFileTag
+             << "currentFileValidCrc:" << _currentFileValidCrc;
+
     if (fileName.endsWith(".lzma", Qt::CaseInsensitive) || fileName.endsWith(".xz", Qt::CaseInsensitive)) {
         outputFileName = (QDir(QStandardPaths::writableLocation(QStandardPaths::TempLocation)).absoluteFilePath(_currentCacheFileTag));
+        qDebug() << "_downloadCompleteJsonWorker inflating to:" << outputFileName;
+
         if (QGCLZMA::inflateLZMAFile(fileName, outputFileName)) {
             QFile(fileName).remove();
+            qDebug() << "_downloadCompleteJsonWorker inflate OK:" << outputFileName;
         } else {
-            qCWarning(ComponentInformationManagerLog) << "Inflate of compressed json failed" << _currentCacheFileTag;
+            qWarning() << "_downloadCompleteJsonWorker inflate FAILED"
+                       << "input:" << fileName
+                       << "output:" << outputFileName;
             outputFileName.clear();
         }
     } else {
-        outputFileName = fileName;
+        qDebug() << "_downloadCompleteJsonWorker no inflate needed:" << outputFileName;
     }
 
-    if (_currentFileValidCrc) {
-        // cache the file (this will move/remove the temp file as well)
-        outputFileName = _compMgr->fileCache().insert(_currentCacheFileTag, outputFileName);
+    if (_currentFileValidCrc && !outputFileName.isEmpty()) {
+        const QString originalOutputFileName = outputFileName;
+        const QString cachedPath = _compMgr->fileCache().insert(_currentCacheFileTag, outputFileName);
+
+        qDebug() << "_downloadCompleteJsonWorker cache insert"
+                << "input:" << originalOutputFileName
+                << "cachedPath:" << cachedPath;
+
+        if (!cachedPath.isEmpty()) {
+            outputFileName = cachedPath;
+        } else {
+            qWarning() << "_downloadCompleteJsonWorker cache insert failed, using uncached file:"
+                    << originalOutputFileName;
+            outputFileName = originalOutputFileName;
+        }
     }
+
+    qDebug() << "_downloadCompleteJsonWorker returning:" << outputFileName;
+    //FPV
     return outputFileName;
 }
 
@@ -469,6 +494,7 @@ void RequestMetaDataTypeStateMachine::_ftpDownloadComplete(const QString& fileNa
     if (errorMsg.isEmpty()) {
         if (_currentFileName) {
             *_currentFileName = _downloadCompleteJsonWorker(fileName);
+            qDebug() << "_ftpDownloadComplete assigned current file name:" << *_currentFileName;
         }
     } else if (qgcApp()->runningUnitTests()) {
         // Unit test should always succeed
@@ -516,61 +542,75 @@ void RequestMetaDataTypeStateMachine::_httpDownloadComplete(QString remoteFile, 
 
 void RequestMetaDataTypeStateMachine::_requestFile(const QString& cacheFileTag, bool crcValid, const QString& uri, QString& outputFileName)
 {
+    //FPV
+    qDebug() << "_requestFile"
+             << "compId" << _compInfo->compId
+             << "available" << _compInfo->available()
+             << "uri" << uri
+             << "cacheTag" << cacheFileTag
+             << "crcValid" << crcValid;
+
     FTPManager* ftpManager = _compInfo->vehicle->ftpManager();
     _currentCacheFileTag = cacheFileTag;
     _currentFileName = &outputFileName;
     _currentFileValidCrc = crcValid;
     outputFileName.clear();
 
-    qDebug() << "_requestFile"
-             << "compId:" << _compInfo->compId
-             << "available:" << _compInfo->available()
-             << "uri:" << uri
-             << "cacheFileTag:" << cacheFileTag
-             << "crcValid:" << crcValid;
-
     if (_compInfo->available() && !uri.isEmpty()) {
         const QString cachedFile = crcValid ? _compMgr->fileCache().access(cacheFileTag) : "";
 
-        if (cachedFile.isEmpty()) {
-            qCDebug(ComponentInformationManagerLog) << "Downloading json" << uri;
-            if (_uriIsMAVLinkFTP(uri)) {
-                qDebug() << "Starting FTP download"
-                        << "metadataCompId:" << _compInfo->compId
-                        << "ftpTargetCompId:" << MAV_COMP_ID_AUTOPILOT1
-                        << "uri:" << uri;
+        qDebug() << "_requestFile cachedFile =" << cachedFile;
 
-                connect(ftpManager, &FTPManager::downloadComplete, this, &RequestMetaDataTypeStateMachine::_ftpDownloadComplete);
-                if (ftpManager->download(MAV_COMP_ID_AUTOPILOT1, uri, QStandardPaths::writableLocation(QStandardPaths::TempLocation))) {
+        if (cachedFile.isEmpty()) {
+            qDebug() << "Downloading json" << uri;
+
+            if (_uriIsMAVLinkFTP(uri)) {
+                connect(ftpManager, &FTPManager::downloadComplete,
+                        this, &RequestMetaDataTypeStateMachine::_ftpDownloadComplete);
+
+                QString ftpPath = uri;
+                ftpPath.remove(QStringLiteral("mftp://"));
+                if (ftpPath.startsWith(QStringLiteral("///"))) {
+                    ftpPath.remove(0, 2);
+                }
+
+                qDebug() << "Normalized FTP path:" << ftpPath;
+
+                if (ftpManager->download(_compInfo->compId,
+                                         ftpPath,
+                                         QStandardPaths::writableLocation(QStandardPaths::TempLocation))) {
                     _downloadStartTime.start();
-                    connect(ftpManager, &FTPManager::commandProgress, this, &RequestMetaDataTypeStateMachine::_ftpDownloadProgress);
+                    connect(ftpManager, &FTPManager::commandProgress,
+                            this, &RequestMetaDataTypeStateMachine::_ftpDownloadProgress);
                 } else {
-                    qCWarning(ComponentInformationManagerLog) << "RequestMetaDataTypeStateMachine::_requestFile FTPManager::download returned failure";
-                    disconnect(ftpManager, &FTPManager::downloadComplete, this, &RequestMetaDataTypeStateMachine::_ftpDownloadComplete);
+                    qDebug() << "RequestMetaDataTypeStateMachine::_requestFile FTPManager::download returned failure";
+                    disconnect(ftpManager, &FTPManager::downloadComplete,
+                               this, &RequestMetaDataTypeStateMachine::_ftpDownloadComplete);
                     advance();
                 }
             } else {
-                connect(_compMgr->_cachedFileDownload, &QGCCachedFileDownload::downloadComplete, this,
-                        &RequestMetaDataTypeStateMachine::_httpDownloadComplete);
+                connect(_compMgr->_cachedFileDownload, &QGCCachedFileDownload::downloadComplete,
+                        this, &RequestMetaDataTypeStateMachine::_httpDownloadComplete);
+
                 if (_compMgr->_cachedFileDownload->download(uri, crcValid ? 0 : ComponentInformationManager::cachedFileMaxAgeSec)) {
                     _downloadStartTime.start();
                 } else {
-                    qCWarning(ComponentInformationManagerLog) << "RequestMetaDataTypeStateMachine::_requestFile QGCCachedFileDownload::download returned failure";
-                    disconnect(_compMgr->_cachedFileDownload, &QGCCachedFileDownload::downloadComplete, this,
-                               &RequestMetaDataTypeStateMachine::_httpDownloadComplete);
+                    qDebug() << "RequestMetaDataTypeStateMachine::_requestFile QGCCachedFileDownload::download returned failure";
+                    disconnect(_compMgr->_cachedFileDownload, &QGCCachedFileDownload::downloadComplete,
+                               this, &RequestMetaDataTypeStateMachine::_httpDownloadComplete);
                     advance();
                 }
             }
         } else {
-            qCDebug(ComponentInformationManagerLog) << "Using cached file" << cachedFile;
+            qDebug() << "Using cached file" << cachedFile;
             outputFileName = cachedFile;
             advance();
         }
     } else {
-        qCDebug(ComponentInformationManagerLog) << "Skipping download. Component information not available for" << _currentCacheFileTag;
+        qDebug() << "Skipping download. Component information not available for" << _currentCacheFileTag;
         advance();
     }
-
+    //FPV
 }
 
 void RequestMetaDataTypeStateMachine::_stateRequestMetaDataJson(StateMachine* stateMachine)
@@ -663,70 +703,73 @@ void RequestMetaDataTypeStateMachine::_stateRequestComplete(StateMachine* stateM
 {
     RequestMetaDataTypeStateMachine* requestMachine = static_cast<RequestMetaDataTypeStateMachine*>(stateMachine);
     CompInfo* compInfo = requestMachine->compInfo();
+    //FPV
+    qDebug() << "_stateRequestComplete"
+             << "jsonMetadataFileName" << requestMachine->_jsonMetadataFileName
+             << "jsonMetadataTranslatedFileName" << requestMachine->_jsonMetadataTranslatedFileName;
 
     QString jsonFile;
-    if (requestMachine->_jsonMetadataTranslatedFileName.isEmpty()) {
-        jsonFile = requestMachine->_jsonMetadataFileName;
-        compInfo->setJson(jsonFile);
-    } else {
+    const bool usingTranslatedFile = !requestMachine->_jsonMetadataTranslatedFileName.isEmpty();
+
+    if (usingTranslatedFile) {
         jsonFile = requestMachine->_jsonMetadataTranslatedFileName;
-        compInfo->setJson(jsonFile);
+    } else {
+        jsonFile = requestMachine->_jsonMetadataFileName;
     }
 
-    qDebug() << "Metadata parse complete"
-             << "compId:" << compInfo->compId
-             << "type:" << requestMachine->typeToString()
-             << "jsonFile:" << jsonFile;
+    // Let the normal QGC parser run first
+    compInfo->setJson(jsonFile);
 
-    if (compInfo->compId == 100 && !jsonFile.isEmpty()) {
+    if (!jsonFile.isEmpty()) {
         QFile file(jsonFile);
-        if (file.open(QIODevice::ReadOnly)) {
-            const QByteArray rawJson = file.readAll();
+        if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+            const QByteArray jsonData = file.readAll();
             file.close();
 
-            qDebug().noquote() << "Component 100 metadata raw JSON:";
-            qDebug().noquote() << rawJson;
+            qDebug() << "----- COMPONENT METADATA JSON BEGIN -----";
+            qDebug().noquote() << jsonData;
+            qDebug() << "----- COMPONENT METADATA JSON END -----";
 
             QJsonParseError parseError;
-            const QJsonDocument doc = QJsonDocument::fromJson(rawJson, &parseError);
+            const QJsonDocument doc = QJsonDocument::fromJson(jsonData, &parseError);
 
-            if (parseError.error == QJsonParseError::NoError) {
-                if (doc.isObject()) {
-                    const QJsonObject obj = doc.object();
+            if (parseError.error == QJsonParseError::NoError && doc.isObject()) {
+                const QJsonObject obj = doc.object();
 
-                    qDebug() << "Component 100 parsed metadata:";
-                    qDebug() << " version:" << obj.value("version").toInt();
-                    qDebug() << " description:" << obj.value("description").toString();
-                    qDebug() << " vendorName:" << obj.value("vendorName").toString();
-                    qDebug() << " modelName:" << obj.value("modelName").toString();
-                    qDebug() << " softwareVersion:" << obj.value("softwareVersion").toString();
+                const QString modelName = obj.value(QStringLiteral("modelName")).toString();
+                const QString vendorName = obj.value(QStringLiteral("vendorName")).toString();
+                const QString softwareVersion = obj.value(QStringLiteral("softwareVersion")).toString();
 
-                    const QJsonValue compMetadataTypeValue = obj.value("compMetadataType");
-                    if (compMetadataTypeValue.isArray()) {
-                        const QJsonArray metaArray = compMetadataTypeValue.toArray();
-                        for (const QJsonValue& value : metaArray) {
-                            if (!value.isObject()) {
-                                continue;
-                            }
+                qDebug() << "Parsed metadata"
+                         << "compId:" << compInfo->compId
+                         << "vendorName:" << vendorName
+                         << "modelName:" << modelName
+                         << "softwareVersion:" << softwareVersion;
 
-                            const QJsonObject entry = value.toObject();
-                            qDebug() << " compMetadataType entry:"
-                                     << "type =" << entry.value("type").toString()
-                                     << "uri =" << entry.value("uri").toString();
-                        }
-                    } else {
-                        qDebug() << "compMetadataType is not an array or not present";
-                    }
-                } else {
-                    qWarning() << "Metadata JSON for compId 100 is valid JSON but not a JSON object";
+                // Only use your custom component metadata for auto-layout detection
+                if (compInfo->compId == 100 && !modelName.isEmpty()) {
+                    compInfo->vehicle->setComponentModelName(modelName);
+
+                    qDebug() << "Vehicle componentModelName updated from metadata:"
+                             << modelName
+                             << "isAVFPV:"
+                             << (modelName == QStringLiteral("AV_FPV"));
                 }
             } else {
-                qWarning() << "Failed to parse metadata JSON for compId 100:" << parseError.errorString();
+                qWarning() << "Failed to parse metadata JSON for compId"
+                           << compInfo->compId
+                           << ":"
+                           << parseError.errorString();
             }
         } else {
-            qWarning() << "Failed to open metadata JSON file for compId 100:" << jsonFile;
+            qWarning() << "Failed to open metadata JSON:" << jsonFile;
         }
     }
+
+    if (usingTranslatedFile && !requestMachine->_jsonMetadataTranslatedFileName.isEmpty()) {
+        QFile(requestMachine->_jsonMetadataTranslatedFileName).remove();
+    }
+    //FPV
 
     if (!requestMachine->_jsonMetadataCrcValid && !requestMachine->_jsonMetadataFileName.isEmpty()) {
         QFile(requestMachine->_jsonMetadataFileName).remove();
@@ -734,35 +777,9 @@ void RequestMetaDataTypeStateMachine::_stateRequestComplete(StateMachine* stateM
     if (!requestMachine->_jsonMetadataCrcValid && !requestMachine->_jsonTranslationFileName.isEmpty()) {
         QFile(requestMachine->_jsonTranslationFileName).remove();
     }
-    if (!requestMachine->_jsonMetadataTranslatedFileName.isEmpty()) {
-        QFile(requestMachine->_jsonMetadataTranslatedFileName).remove();
-    }
 
     requestMachine->advance();
 }
-
-// void RequestMetaDataTypeStateMachine::_stateRequestComplete(StateMachine* stateMachine)
-// {
-//     RequestMetaDataTypeStateMachine*    requestMachine  = static_cast<RequestMetaDataTypeStateMachine*>(stateMachine);
-//     CompInfo*                           compInfo        = requestMachine->compInfo();
-
-//     if (requestMachine->_jsonMetadataTranslatedFileName.isEmpty()) {
-//         compInfo->setJson(requestMachine->_jsonMetadataFileName);
-//     } else {
-//         compInfo->setJson(requestMachine->_jsonMetadataTranslatedFileName);
-//         QFile(requestMachine->_jsonMetadataTranslatedFileName).remove();
-//     }
-
-//     // if we don't have a CRC we didn't cache the file and we need to delete it
-//     if (!requestMachine->_jsonMetadataCrcValid && !requestMachine->_jsonMetadataFileName.isEmpty()) {
-//         QFile(requestMachine->_jsonMetadataFileName).remove();
-//     }
-//     if (!requestMachine->_jsonMetadataCrcValid && !requestMachine->_jsonTranslationFileName.isEmpty()) {
-//         QFile(requestMachine->_jsonTranslationFileName).remove();
-//     }
-
-//     requestMachine->advance();
-// }
 
 bool RequestMetaDataTypeStateMachine::_uriIsMAVLinkFTP(const QString& uri)
 {

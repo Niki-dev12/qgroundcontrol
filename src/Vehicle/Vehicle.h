@@ -292,6 +292,16 @@ public:
     Q_PROPERTY(bool aiStrike READ aiStrike NOTIFY aiStrikeChanged)
     Q_PROPERTY(bool currentTrackerTypeValue READ currentTrackerTypeValue NOTIFY trackerTypeChanged)
     Q_PROPERTY(bool currentSelectModeValue READ currentSelectModeValue NOTIFY selectModeChanged)
+
+    Q_PROPERTY(QString componentModelName READ componentModelName NOTIFY componentModelNameChanged)
+    Q_PROPERTY(bool isAVFPV READ isAVFPV NOTIFY isAVFPVChanged)
+
+    public:
+    QString componentModelName() const { return _componentModelName; }
+    bool isAVFPV() const { return _componentModelName == QStringLiteral("AV_FPV"); }
+
+    void setComponentModelName(const QString& modelName);
+
     //FPV
     /// Resets link status counters
     Q_INVOKABLE void resetCounters  ();
@@ -920,6 +930,9 @@ signals:
     void aiStrikeChanged(bool visible);
     void trackerTypeChanged(bool visible);
     void selectModeChanged(bool visible);
+
+    void componentModelNameChanged();
+    void isAVFPVChanged();
     //FPV
     void firmwareVersionChanged         ();
     void firmwareCustomVersionChanged   ();
@@ -1061,6 +1074,8 @@ private:
     int _currentAIStrikeValue;
     bool _hudVisible = false;
     int _currentSelectModeValue;
+
+    QString _componentModelName;
     //FPV
 
     MAV_AUTOPILOT       _firmwareType;

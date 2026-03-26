@@ -1545,6 +1545,23 @@ void Vehicle::toggleSelectMode()
         static_cast<float>(paramTE + 1),
         0, 0, 0, 0, 0, 0);
 }
+
+void Vehicle::setComponentModelName(const QString& modelName)
+{
+    if (_componentModelName == modelName) {
+        return;
+    }
+
+    const bool oldIsAVFPV = isAVFPV();
+    _componentModelName = modelName;
+    const bool newIsAVFPV = isAVFPV();
+
+    emit componentModelNameChanged();
+
+    if (oldIsAVFPV != newIsAVFPV) {
+        emit isAVFPVChanged();
+    }
+}
 //FPV
 
 void Vehicle::setActuatorsMetadata([[maybe_unused]] uint8_t compid,
