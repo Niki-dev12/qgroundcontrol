@@ -85,6 +85,7 @@ QGC_LOGGING_CATEGORY(VehicleLog, "VehicleLog")
 #define FPV_CONTROL 191
 #define COMPONENT_ID_USER 25  // av-tagging
 #define COMPONENT_CAM_ID 100  // av-fpv-vision
+#define AV_FPV "AV_FPV"
 float gstreamWidth;
 float gstreamHeight;
 //FPV
@@ -1546,20 +1547,28 @@ void Vehicle::toggleSelectMode()
         0, 0, 0, 0, 0, 0);
 }
 
+static Vehicle::CustomUILayout _layoutFromModelName(const QString& modelName)
+{
+    if (modelName == QStringLiteral(AV_FPV)) {
+        return Vehicle::CustomUILayoutAVFPV;
+    }
+    return Vehicle::CustomUILayoutNone;
+}
+
 void Vehicle::setComponentModelName(const QString& modelName)
 {
-    if (_componentModelName == modelName) {
-        return;
+    const QString oldModelName = _componentModelName;
+    const CustomUILayout oldLayout = _detectedCustomUILayout;
+
+    _componentModelName = modelName;
+    _detectedCustomUILayout = _layoutFromModelName(modelName);
+
+    if (_componentModelName != oldModelName) {
+        emit componentModelNameChanged();
     }
 
-    const bool oldIsAVFPV = isAVFPV();
-    _componentModelName = modelName;
-    const bool newIsAVFPV = isAVFPV();
-
-    emit componentModelNameChanged();
-
-    if (oldIsAVFPV != newIsAVFPV) {
-        emit isAVFPVChanged();
+    if (_detectedCustomUILayout != oldLayout) {
+        emit detectedCustomUILayoutChanged();
     }
 }
 //FPV

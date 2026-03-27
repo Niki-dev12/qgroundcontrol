@@ -294,11 +294,20 @@ public:
     Q_PROPERTY(bool currentSelectModeValue READ currentSelectModeValue NOTIFY selectModeChanged)
 
     Q_PROPERTY(QString componentModelName READ componentModelName NOTIFY componentModelNameChanged)
-    Q_PROPERTY(bool isAVFPV READ isAVFPV NOTIFY isAVFPVChanged)
+    Q_PROPERTY(CustomUILayout detectedCustomUILayout READ detectedCustomUILayout NOTIFY detectedCustomUILayoutChanged)
+    Q_PROPERTY(int detectedCustomUILayoutValue READ detectedCustomUILayoutValue NOTIFY detectedCustomUILayoutChanged)
 
     public:
     QString componentModelName() const { return _componentModelName; }
-    bool isAVFPV() const { return _componentModelName == QStringLiteral("AV_FPV"); }
+
+    enum CustomUILayout {
+        CustomUILayoutNone = 0,
+        CustomUILayoutAVFPV
+    };
+    Q_ENUM(CustomUILayout)
+
+    CustomUILayout detectedCustomUILayout() const { return _detectedCustomUILayout; }
+    int detectedCustomUILayoutValue() const { return static_cast<int>(_detectedCustomUILayout); }
 
     void setComponentModelName(const QString& modelName);
 
@@ -932,7 +941,8 @@ signals:
     void selectModeChanged(bool visible);
 
     void componentModelNameChanged();
-    void isAVFPVChanged();
+    void detectedCustomUILayoutChanged();
+    // void isAVFPVChanged();
     //FPV
     void firmwareVersionChanged         ();
     void firmwareCustomVersionChanged   ();
@@ -1076,6 +1086,7 @@ private:
     int _currentSelectModeValue;
 
     QString _componentModelName;
+    CustomUILayout _detectedCustomUILayout = CustomUILayoutNone;
     //FPV
 
     MAV_AUTOPILOT       _firmwareType;
