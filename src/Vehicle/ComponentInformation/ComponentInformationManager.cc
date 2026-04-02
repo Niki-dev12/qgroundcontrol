@@ -322,20 +322,6 @@ static void _requestMessageResultHandler(void* resultHandlerData, MAV_RESULT res
     requestMachine->advance();
 }
 
-// static void _requestMessageResultHandler(void* resultHandlerData, MAV_RESULT result,
-//     [[maybe_unused]] Vehicle::RequestMessageResultHandlerFailureCode_t failureCode, const mavlink_message_t &message)
-// {
-//     RequestMetaDataTypeStateMachine* requestMachine = static_cast<RequestMetaDataTypeStateMachine*>(resultHandlerData);
-
-//     if (result == MAV_RESULT_ACCEPTED) {
-//         mavlink_component_metadata_t componentMetadata;
-//         mavlink_msg_component_metadata_decode(&message, &componentMetadata);
-//         requestMachine->compInfo()->setUriMetaData(componentMetadata.uri, componentMetadata.file_crc);
-//     } // else: try deprecated COMPONENT_INFORMATION
-
-//     requestMachine->advance();
-// }
-
 static void _requestMessageResultHandlerDeprecated(void* resultHandlerData, MAV_RESULT result, Vehicle::RequestMessageResultHandlerFailureCode_t failureCode, const mavlink_message_t &message)
 {
     RequestMetaDataTypeStateMachine* requestMachine = static_cast<RequestMetaDataTypeStateMachine*>(resultHandlerData);
