@@ -292,6 +292,25 @@ public:
     Q_PROPERTY(bool aiStrike READ aiStrike NOTIFY aiStrikeChanged)
     Q_PROPERTY(bool currentTrackerTypeValue READ currentTrackerTypeValue NOTIFY trackerTypeChanged)
     Q_PROPERTY(bool currentSelectModeValue READ currentSelectModeValue NOTIFY selectModeChanged)
+
+    Q_PROPERTY(QString componentModelName READ componentModelName NOTIFY componentModelNameChanged)
+    Q_PROPERTY(CustomUILayout detectedCustomUILayout READ detectedCustomUILayout NOTIFY detectedCustomUILayoutChanged)
+    Q_PROPERTY(int detectedCustomUILayoutValue READ detectedCustomUILayoutValue NOTIFY detectedCustomUILayoutChanged)
+
+    public:
+    QString componentModelName() const { return _componentModelName; }
+
+    enum CustomUILayout {
+        CustomUILayoutNone = 0,
+        CustomUILayoutAVFPV
+    };
+    Q_ENUM(CustomUILayout)
+
+    CustomUILayout detectedCustomUILayout() const { return _detectedCustomUILayout; }
+    int detectedCustomUILayoutValue() const { return static_cast<int>(_detectedCustomUILayout); }
+
+    void setComponentModelName(const QString& modelName);
+
     //FPV
     /// Resets link status counters
     Q_INVOKABLE void resetCounters  ();
@@ -920,6 +939,10 @@ signals:
     void aiStrikeChanged(bool visible);
     void trackerTypeChanged(bool visible);
     void selectModeChanged(bool visible);
+
+    void componentModelNameChanged();
+    void detectedCustomUILayoutChanged();
+    // void isAVFPVChanged();
     //FPV
     void firmwareVersionChanged         ();
     void firmwareCustomVersionChanged   ();
@@ -1061,6 +1084,9 @@ private:
     int _currentAIStrikeValue;
     bool _hudVisible = false;
     int _currentSelectModeValue;
+
+    QString _componentModelName;
+    CustomUILayout _detectedCustomUILayout = CustomUILayoutNone;
     //FPV
 
     MAV_AUTOPILOT       _firmwareType;

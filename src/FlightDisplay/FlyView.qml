@@ -109,7 +109,17 @@ Item {
     readonly property real _edgeSlotHeight: _edgeBtnSize + _edgeSpacing
 
     readonly property int uiLayout: QGroundControl.settingsManager.appSettings.uiLayout.rawValue
-    readonly property bool _isFPVLayout: QGroundControl.settingsManager.appSettings.uiLayout.rawValue === 2
+
+    readonly property int _layoutNone: 0
+    readonly property int _layoutAVFPV: 1
+
+    readonly property int _detectedVehicleLayout: _activeVehicle ? _activeVehicle.detectedCustomUILayoutValue : _layoutNone
+
+    readonly property bool _isFPVLayout: (
+        uiLayout === 2 ? true :                                      // Forced FPV
+        uiLayout === 1 ? (_detectedVehicleLayout === _layoutAVFPV) : // Auto
+        false                                                        // Normal
+    )
     //FPV
 
     function _calcCenterViewPort() {

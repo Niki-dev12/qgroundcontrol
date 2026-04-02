@@ -15,6 +15,8 @@
 #include <QtCore/QElapsedTimer>
 #include <QtCore/QLoggingCategory>
 
+#include <QtCore/QList>
+
 Q_DECLARE_LOGGING_CATEGORY(RequestMetaDataTypeStateMachineLog)
 Q_DECLARE_LOGGING_CATEGORY(ComponentInformationManagerLog)
 
@@ -126,6 +128,11 @@ private:
     bool _isCompTypeSupported           (COMP_METADATA_TYPE type);
     void _updateAllUri                  ();
 
+    void _ensureCompInfoSet(uint8_t compId);
+    void _updateAllUri(uint8_t compId);
+    void requestComponentGeneralInformation(uint8_t compId);
+    void _startNextGeneralRequest();
+
     static QString _getFileCacheTag(int compInfoType, uint32_t crc, bool isTranslation);
 
     static void _stateRequestCompInfoGeneral        (StateMachine* stateMachine);
@@ -157,4 +164,7 @@ private:
     static constexpr int _cStates = sizeof(_rgStates) / sizeof(_rgStates[0]);
 
     friend class RequestMetaDataTypeStateMachine;
+
+    QList<uint8_t> _pendingGeneralCompIds;
+    int _currentGeneralCompIndex = -1;
 };
