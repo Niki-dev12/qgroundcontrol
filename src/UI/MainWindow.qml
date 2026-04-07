@@ -22,9 +22,9 @@ import QGroundControl.FlightDisplay
 import QGroundControl.FlightMap
 
 import QGroundControl.UTMSP
+// import QGroundControl.FactSystem
 
 //FPV
-import Qt.labs.settings 1.0 
 
 /// @brief Native QML top level window
 /// All properties defined here are visible to all QML pages.
@@ -44,50 +44,19 @@ ApplicationWindow {
     readonly property var _activeVehicle: QGroundControl.multiVehicleManager.activeVehicle
     readonly property int _modelId: _activeVehicle ? _activeVehicle.modelId : -1
 
-    // UI for window geometry
-    Settings {
-        id: winPrefs
-        category: "MainWindow"
-        property bool startFullScreen: false
-        property int normalX: 0
-        property int normalY: 0
-        property int normalW: 1280
-        property int normalH: 800
-    }
-
     // True if currently fullscreen
     property bool isFullScreen: visibility === Window.FullScreen
 
     function toggleFullScreen() {
         if (visibility === Window.FullScreen) {
-            // Leaving fullscreen
             visibility = Window.Windowed
-            x = winPrefs.normalX
-            y = winPrefs.normalY
-            width  = winPrefs.normalW
-            height = winPrefs.normalH
-            winPrefs.startFullScreen = false
         } else {
-            // Entering fullscreen and remember
-            winPrefs.normalX = x
-            winPrefs.normalY = y
-            winPrefs.normalW = width
-            winPrefs.normalH = height
             visibility = Window.FullScreen
-            winPrefs.startFullScreen = true
         }
-    }
-
-    // Keep the setting
-    onVisibilityChanged: {
-        winPrefs.startFullScreen = (visibility === Window.FullScreen)
     }
 
     Component.onCompleted: {
         firstRunPromptManager.nextPrompt()
-        if (winPrefs.startFullScreen) {
-            visibility = Window.FullScreen
-        }
     }
 
     Shortcut {
