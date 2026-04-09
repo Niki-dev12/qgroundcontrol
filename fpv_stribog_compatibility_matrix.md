@@ -13,13 +13,21 @@ For the matrix below:
 - `Stribog` means the merged application when used without the AV FPV-specific automatic layout path.
 - `Required drone app/component` refers to the onboard service that must exist for the feature to work in practice.
 
+## Usage labels
+
+- `Yes`: Fully available and directly usable in that workflow.
+- `Partial`: Present in that workflow, but with reduced behavior, narrower activation conditions, or missing some integration compared with the primary workflow.
+- `Limited`: Technically available only in a constrained or dependency-heavy way, so it is not a first-class part of that workflow.
+- `No by default`: Not shown or enabled in the normal workflow unless the operator explicitly forces it or changes configuration.
+- `Platform-specific`: Applies only on matching hardware or controller conditions.
+
 ## Matrix
 
 | Feature area | Added vs upstream `master` | FPV use | Stribog use | Required drone app/component | Limitations |
 | --- | --- | --- | --- | --- | --- |
 | UI layout selection | Added application setting for `Normal`, `Auto`, and `FPV` layouts. | Yes | Partial | None | The setting text describes `Default, Stribog, or FPV`, but the actual enum is `Normal, Auto, FPV`. `Auto` currently switches only when the detected vehicle model name is exactly `AV_FPV`. |
 | FPV fly-view side strips | Added left/right vertical action strips around the video-centric fly view. | Yes | No by default | FPV control component `191` for command handling | Visible only when FPV layout is active. Stribog is not auto-detected as a separate layout in current code. |
-| Fullscreen hotkey | Added fullscreen toggle on `F11`. | Yes | Yes | None | Fullscreen is working. |
+| Fullscreen hotkey | Added fullscreen toggle on `F11`. | Yes | Yes | None | No limitation. |
 | Custom video HUD overlay | Added `CustomHudOverlay.qml` with heading, pitch/roll, altitude, speed, compass, telemetry and gimbal cues. | Yes | Yes | Normal vehicle telemetry; video feed | Useful anywhere video is present, but operationally. Overlay quality depends on valid heading, attitude, speed and altitude telemetry. |
 | HUD visibility control | Added HUD toggle from fly view and joystick actions, with backend state tracking. | Yes | Partial | FPV control component `191` | The toggle sends custom command `31059`. Without the FPV control service, the UI toggle has no effect on the vehicle-side workflow. |
 | Click-to-designate target | Added single-click designation on the live video stream. | Yes | Limited | FPV vision component `100` (`av-fpv-vision`) | Sent as `MAV_CMD_USER_3` to component `100`. If that component is absent, nothing consumes the designation. |
@@ -30,7 +38,7 @@ For the matrix below:
 | AGL instrument | Added `AGL` as a selectable fly-view instrument panel. | Yes | Yes | No special drone app; normal position/altitude telemetry | Falls back to relative altitude when terrain-under-vehicle data is unavailable. |
 | Terrain-ahead profile and risk coloring | Added terrain-ahead sampling, under-vehicle clearance, and warning colors. | Yes | Yes | No special drone app; terrain source plus valid vehicle telemetry | Warning quality depends on terrain data availability, heading, and AMSL/relative altitude accuracy. |
 | Camera FOV status support | Added `CAMERA_FOV_STATUS` handling and current HFOV/VFOV tracking. | Yes | Yes | Camera service publishing `CAMERA_FOV_STATUS` | If the camera does not publish FOV status, QGC falls back to configured FOV values. |
-| Aspect-ratio-aware FOV | Added camera aspect-derived VFOV calculation and per-camera aspect tracking. | Yes | Yes | Camera information with usable aspect metadata | If camera aspect data is missing, the code falls back to `9:16`. |
+| Aspect-ratio-aware FOV | Added VFOV, derived from camera aspect ratio, and per-camera aspect tracking. | Yes | Yes | Camera information with usable aspect metadata | If camera aspect data is missing, the code falls back to `9:16`. |
 | Multi-camera FOV sync into payload control | Added syncing of the selected camera FOV into gimbal settings and zoom-derived speed. | Yes | Yes | Camera service with FOV and, ideally, zoom telemetry | Best results require both current camera selection and zoom/FOV properties. |
 | Click-to-point gimbal using live FOV | Replaced static-angle assumptions with FOV-based angular mapping. | Yes | Yes | Gimbal plus camera FOV data | If live FOV is missing, the behavior falls back to configured HFOV/VFOV values. |
 | Zoom-adaptive gimbal speed | Added `zoomMinSpeed`, `zoomMaxSpeed`, and computed `gimbalSpeed`. | Yes | Yes | Camera zoom telemetry for full benefit | Without zoom telemetry, speed falls back to the configured max-speed side of the range. |
