@@ -11,16 +11,17 @@ Item {
 
     FactPanelController { id: controller; }
 
-    property Fact _rc5Function:         controller.getParameterFact(-1, "SERVO5_FUNCTION")
-    property Fact _rc6Function:         controller.getParameterFact(-1, "SERVO6_FUNCTION")
-    property Fact _rc7Function:         controller.getParameterFact(-1, "SERVO7_FUNCTION")
-    property Fact _rc8Function:         controller.getParameterFact(-1, "SERVO8_FUNCTION")
-    property Fact _rc9Function:         controller.getParameterFact(-1, "SERVO9_FUNCTION")
-    property Fact _rc10Function:        controller.getParameterFact(-1, "SERVO10_FUNCTION")
-    property Fact _rc11Function:        controller.getParameterFact(-1, "SERVO11_FUNCTION")
-    property Fact _rc12Function:        controller.getParameterFact(-1, "SERVO12_FUNCTION")
-    property Fact _rc13Function:        controller.getParameterFact(-1, "SERVO13_FUNCTION")
-    property Fact _rc14Function:        controller.getParameterFact(-1, "SERVO14_FUNCTION")
+    property bool _lightOutputParamsAvailable: controller.parameterExists(-1, "SERVO5_FUNCTION")
+    property Fact _rc5Function:         _lightOutputParamsAvailable ? controller.getParameterFact(-1, "SERVO5_FUNCTION") : null
+    property Fact _rc6Function:         _lightOutputParamsAvailable ? controller.getParameterFact(-1, "SERVO6_FUNCTION") : null
+    property Fact _rc7Function:         _lightOutputParamsAvailable ? controller.getParameterFact(-1, "SERVO7_FUNCTION") : null
+    property Fact _rc8Function:         _lightOutputParamsAvailable ? controller.getParameterFact(-1, "SERVO8_FUNCTION") : null
+    property Fact _rc9Function:         _lightOutputParamsAvailable ? controller.getParameterFact(-1, "SERVO9_FUNCTION") : null
+    property Fact _rc10Function:        _lightOutputParamsAvailable ? controller.getParameterFact(-1, "SERVO10_FUNCTION") : null
+    property Fact _rc11Function:        _lightOutputParamsAvailable ? controller.getParameterFact(-1, "SERVO11_FUNCTION") : null
+    property Fact _rc12Function:        _lightOutputParamsAvailable ? controller.getParameterFact(-1, "SERVO12_FUNCTION") : null
+    property Fact _rc13Function:        _lightOutputParamsAvailable ? controller.getParameterFact(-1, "SERVO13_FUNCTION") : null
+    property Fact _rc14Function:        _lightOutputParamsAvailable ? controller.getParameterFact(-1, "SERVO14_FUNCTION") : null
 
     readonly property int   _rcFunctionRCIN9:               59
     readonly property int   _rcFunctionRCIN10:              60
@@ -28,12 +29,18 @@ Item {
     readonly property int   _lastLightsOutChannel:          14
 
     Component.onCompleted: {
-        calcLightOutValues()
+        if (_lightOutputParamsAvailable) {
+            calcLightOutValues()
+        }
     }
 
     /// Light output channels are stored in SERVO#_FUNCTION parameters. We need to loop through those
     /// to find them and setup the ui accordindly.
     function calcLightOutValues() {
+        if (!_lightOutputParamsAvailable) {
+            return
+        }
+
         lightsLoader.lights1OutIndex = 0
         lightsLoader.lights2OutIndex = 0
         for (var channel=_firstLightsOutChannel; channel<=_lastLightsOutChannel; channel++) {
@@ -84,6 +91,7 @@ Item {
 
     Column {
         anchors.fill:       parent
+        visible:            _lightOutputParamsAvailable
 
         VehicleSummaryRow {
             labelText:  qsTr("Lights Output 1")

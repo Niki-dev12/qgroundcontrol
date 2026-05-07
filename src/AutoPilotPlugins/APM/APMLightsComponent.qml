@@ -33,20 +33,23 @@ SetupPage {
 
             property var  _activeVehicle:       QGroundControl.multiVehicleManager.activeVehicle
             property bool _oldFW:               _activeVehicle.versionCompare(3, 5, 2) < 0
-            property Fact _rc5Function:         controller.getParameterFact(-1, "SERVO5_FUNCTION")
-            property Fact _rc6Function:         controller.getParameterFact(-1, "SERVO6_FUNCTION")
-            property Fact _rc7Function:         controller.getParameterFact(-1, "SERVO7_FUNCTION")
-            property Fact _rc8Function:         controller.getParameterFact(-1, "SERVO8_FUNCTION")
-            property Fact _rc9Function:         controller.getParameterFact(-1, "SERVO9_FUNCTION")
-            property Fact _rc10Function:        controller.getParameterFact(-1, "SERVO10_FUNCTION")
-            property Fact _rc11Function:        controller.getParameterFact(-1, "SERVO11_FUNCTION")
-            property Fact _rc12Function:        controller.getParameterFact(-1, "SERVO12_FUNCTION")
-            property Fact _rc13Function:        controller.getParameterFact(-1, "SERVO13_FUNCTION")
-            property Fact _rc14Function:        controller.getParameterFact(-1, "SERVO14_FUNCTION")
-            property Fact _rc15Function:        controller.getParameterFact(-1, "SERVO15_FUNCTION")
-            property Fact _rc16Function:        controller.getParameterFact(-1, "SERVO16_FUNCTION")
-            property Fact _stepSize:            _oldFW ? controller.getParameterFact(-1, "JS_LIGHTS_STEP") : null // v3.5.1 and prior
-            property Fact _numSteps:            _oldFW ? null : controller.getParameterFact(-1, "JS_LIGHTS_STEPS") // v3.5.2 and up
+            property bool _lightOutputParamsAvailable: controller.parameterExists(-1, "SERVO5_FUNCTION") &&
+                                                       controller.parameterExists(-1, "BRD_PWM_COUNT") &&
+                                                       (_oldFW ? controller.parameterExists(-1, "JS_LIGHTS_STEP") : controller.parameterExists(-1, "JS_LIGHTS_STEPS"))
+            property Fact _rc5Function:         _lightOutputParamsAvailable ? controller.getParameterFact(-1, "SERVO5_FUNCTION") : null
+            property Fact _rc6Function:         _lightOutputParamsAvailable ? controller.getParameterFact(-1, "SERVO6_FUNCTION") : null
+            property Fact _rc7Function:         _lightOutputParamsAvailable ? controller.getParameterFact(-1, "SERVO7_FUNCTION") : null
+            property Fact _rc8Function:         _lightOutputParamsAvailable ? controller.getParameterFact(-1, "SERVO8_FUNCTION") : null
+            property Fact _rc9Function:         _lightOutputParamsAvailable ? controller.getParameterFact(-1, "SERVO9_FUNCTION") : null
+            property Fact _rc10Function:        _lightOutputParamsAvailable ? controller.getParameterFact(-1, "SERVO10_FUNCTION") : null
+            property Fact _rc11Function:        _lightOutputParamsAvailable ? controller.getParameterFact(-1, "SERVO11_FUNCTION") : null
+            property Fact _rc12Function:        _lightOutputParamsAvailable ? controller.getParameterFact(-1, "SERVO12_FUNCTION") : null
+            property Fact _rc13Function:        _lightOutputParamsAvailable ? controller.getParameterFact(-1, "SERVO13_FUNCTION") : null
+            property Fact _rc14Function:        _lightOutputParamsAvailable ? controller.getParameterFact(-1, "SERVO14_FUNCTION") : null
+            property Fact _rc15Function:        _lightOutputParamsAvailable ? controller.getParameterFact(-1, "SERVO15_FUNCTION") : null
+            property Fact _rc16Function:        _lightOutputParamsAvailable ? controller.getParameterFact(-1, "SERVO16_FUNCTION") : null
+            property Fact _stepSize:            _lightOutputParamsAvailable && _oldFW ? controller.getParameterFact(-1, "JS_LIGHTS_STEP") : null // v3.5.1 and prior
+            property Fact _numSteps:            _lightOutputParamsAvailable && !_oldFW ? controller.getParameterFact(-1, "JS_LIGHTS_STEPS") : null // v3.5.2 and up
 
             readonly property real  _margins:                       ScreenTools.defaultFontPixelHeight
             readonly property int   _rcFunctionDisabled:            0
@@ -54,15 +57,49 @@ SetupPage {
             readonly property int   _rcFunctionRCIN10:              60
             readonly property int   _firstLightsOutChannel:         5
             readonly property int   _lastLightsOutChannel:          16
+            readonly property int   _mavCompIdIlluminator:          36
+            readonly property int   _mavCmdIlluminatorOnOff:        405
+            readonly property int   _mavResultAccepted:             0
+
+            property bool _illuminatorEnabled:      false
+            property bool _illuminatorCommandBusy:  false
+            property bool _illuminatorPendingState: false
+            property string _illuminatorCommandStatusText: ""
+            property string _illuminatorStatusText: _illuminatorCommandStatusText.length > 0 ? _illuminatorCommandStatusText :
+                                                    (_activeVehicle.illuminatorAvailable ?
+                                                        (_activeVehicle.illuminatorStatusKnown ?
+                                                             (_activeVehicle.illuminatorEnabled ? qsTr("Lights are on") : qsTr("Lights are off")) :
+                                                             qsTr("Illuminator detected, status unknown")) :
+                                                        qsTr("Waiting for illuminator heartbeat")) +
+                                                    qsTr(" (%1)").arg(_activeVehicle.illuminatorTarget)
 
             Component.onCompleted: {
-                calcLightOutValues()
-                calcCurrentStep()
+                if (_lightOutputParamsAvailable) {
+                    calcLightOutValues()
+                    calcCurrentStep()
+                }
+                _activeVehicle.requestIlluminatorStatus()
+            }
+
+            function setIlluminatorEnabled(enabled) {
+                _illuminatorPendingState = enabled
+                _illuminatorCommandBusy = true
+                if (_activeVehicle.sendIlluminatorOnOff(enabled)) {
+                    _illuminatorCommandBusy = false
+                    _illuminatorCommandStatusText = enabled ? qsTr("Lights on command sent") : qsTr("Lights off command sent")
+                    _activeVehicle.requestIlluminatorStatus()
+                } else {
+                    _illuminatorCommandBusy = false
+                    _illuminatorCommandStatusText = qsTr("Unable to send illuminator command")
+                }
             }
 
             /// Light output channels are stored in SERVO#_FUNCTION parameters. We need to loop through those
             /// to find them and setup the ui accordindly.
             function calcLightOutValues() {
+                if (!_lightOutputParamsAvailable) {
+                    return
+                }
                 lightsLoader.lights1OutIndex = 0
                 lightsLoader.lights2OutIndex = 0
                 for (var channel=_firstLightsOutChannel; channel<=_lastLightsOutChannel; channel++) {
@@ -76,6 +113,10 @@ SetupPage {
             }
 
             function setRCFunction(channel, rcFunction) {
+                if (!_lightOutputParamsAvailable) {
+                    return
+                }
+
                 // First clear any previous settings for this function
                 for (var index=_firstLightsOutChannel; index<=_lastLightsOutChannel; index++) {
                     var functionFact = controller.getParameterFact(-1, "SERVO" + index + "_FUNCTION")
@@ -92,6 +133,10 @@ SetupPage {
             }
 
             function calcCurrentStep() {
+                if (!_lightOutputParamsAvailable) {
+                    return
+                }
+
                 if (_oldFW) {
                     var i = 1
                     for(i; i <= 10; i++) {
@@ -111,6 +156,10 @@ SetupPage {
             }
 
             function calcStepSize(steps) {
+                if (!_lightOutputParamsAvailable) {
+                    return
+                }
+
                 if (_oldFW) {
                     _stepSize.value = (1900-1100)/steps
                 } else {
@@ -130,6 +179,84 @@ SetupPage {
             Connections { target: _rc13Function; onValueChanged: calcLightOutValues() }
             Connections { target: _rc14Function; onValueChanged: calcLightOutValues() }
 
+            Connections {
+                target: _activeVehicle
+
+                function onMavCommandResult(vehicleId, targetComponent, command, ackResult, failureCode) {
+                    if (vehicleId !== _activeVehicle.id ||
+                            targetComponent !== _mavCompIdIlluminator ||
+                            command !== _mavCmdIlluminatorOnOff) {
+                        return
+                    }
+
+                    _illuminatorCommandBusy = false
+                    if (ackResult === _mavResultAccepted) {
+                        _activeVehicle.requestIlluminatorStatus()
+                    } else {
+                        _illuminatorCommandStatusText = qsTr("Illuminator command rejected")
+                    }
+                }
+
+                function onIlluminatorChanged() {
+                    if (!_illuminatorCommandBusy || _activeVehicle.illuminatorStatusKnown) {
+                        _illuminatorCommandBusy = false
+                        _illuminatorCommandStatusText = ""
+                    }
+                }
+            }
+
+            Item {
+                width:  illuminatorRectangle.x + illuminatorRectangle.width
+                height: illuminatorRectangle.y + illuminatorRectangle.height
+
+                QGCLabel {
+                    id:             illuminatorLabel
+                    text:           qsTr("MAVLink Illuminator")
+                    font.bold:      true
+                }
+
+                Rectangle {
+                    id:                 illuminatorRectangle
+                    anchors.topMargin:  _margins / 2
+                    anchors.top:        illuminatorLabel.bottom
+                    width:              Math.max(illuminatorRow.width, illuminatorStatus.width) + 2 * _margins
+                    height:             illuminatorStatus.y + illuminatorStatus.height + _margins
+                    color:              qgcPal.windowShade
+
+                    Row {
+                        id:                 illuminatorRow
+                        anchors.margins:    _margins
+                        anchors.top:        parent.top
+                        anchors.left:       parent.left
+                        spacing:            _margins
+
+                        QGCSwitch {
+                            id:                 illuminatorSwitch
+                            text:               qsTr("Here4 and indicator LEDs")
+                            checked:            _activeVehicle.illuminatorStatusKnown && _activeVehicle.illuminatorEnabled
+                            enabled:            !_illuminatorCommandBusy
+
+                            onClicked: setIlluminatorEnabled(checked)
+                        }
+
+                        QGCButton {
+                            text:       qsTr("Refresh")
+                            enabled:    !_illuminatorCommandBusy
+                            onClicked:  _activeVehicle.requestIlluminatorStatus()
+                        }
+                    }
+
+                    QGCLabel {
+                        id:                 illuminatorStatus
+                        anchors.margins:    _margins
+                        anchors.top:        illuminatorRow.bottom
+                        anchors.left:       parent.left
+                        text:               _illuminatorStatusText
+                        color:              qgcPal.text
+                    }
+                }
+            }
+
             ListModel {
                 id: lightsOutModel
                 // It appears that QGCComboBox can't handle models that don't have a initial item
@@ -148,6 +275,10 @@ SetupPage {
                 }
 
                 Component.onCompleted: {
+                    if (!_lightOutputParamsAvailable) {
+                        return
+                    }
+
                     // Number of main outputs
                     var baseValue = 8
                     // Extra outputs
@@ -246,6 +377,7 @@ SetupPage {
             Loader {
                 id:                 lightsLoader
                 sourceComponent:    lightSettings
+                visible:            _lightOutputParamsAvailable
 
                 property int    lights1OutIndex:         0
                 property int    lights2OutIndex:         0
