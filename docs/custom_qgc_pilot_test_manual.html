@@ -1,0 +1,1052 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Custom QGroundControl Pilot Test Manual</title>
+  <style>
+    :root {
+      --ink: #1d252f;
+      --muted: #617083;
+      --line: #d9e1ea;
+      --soft: #f5f7fa;
+      --panel: #ffffff;
+      --blue: #215d8f;
+      --green: #27745d;
+      --amber: #946513;
+      --red: #a33b3b;
+      --shadow: 0 14px 42px rgba(18, 35, 52, 0.12);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      color: var(--ink);
+      font-family: Arial, Helvetica, sans-serif;
+      line-height: 1.45;
+      background: #e8eef4;
+    }
+
+    body {
+      margin: 0;
+      font-size: 15px;
+    }
+
+    .page {
+      width: min(1120px, calc(100% - 32px));
+      margin: 24px auto;
+      background: var(--panel);
+      box-shadow: var(--shadow);
+    }
+
+    header {
+      color: #ffffff;
+      background:
+        linear-gradient(90deg, rgba(14, 47, 75, 0.98), rgba(33, 93, 143, 0.9));
+      padding: 42px 48px 34px;
+    }
+
+    .eyebrow {
+      margin: 0 0 12px;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0;
+      text-transform: uppercase;
+      color: rgba(255, 255, 255, 0.78);
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 36px;
+      line-height: 1.1;
+      letter-spacing: 0;
+    }
+
+    .subtitle {
+      max-width: 780px;
+      margin: 16px 0 0;
+      color: rgba(255, 255, 255, 0.88);
+      font-size: 17px;
+    }
+
+    .meta-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-top: 28px;
+    }
+
+    .meta-box {
+      min-height: 72px;
+      border: 1px solid rgba(255, 255, 255, 0.26);
+      background: rgba(255, 255, 255, 0.1);
+      padding: 12px;
+    }
+
+    .meta-box span {
+      display: block;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: rgba(255, 255, 255, 0.7);
+    }
+
+    .meta-box strong {
+      display: block;
+      margin-top: 8px;
+      font-size: 15px;
+      color: #ffffff;
+    }
+
+    nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 18px 48px;
+      border-bottom: 1px solid var(--line);
+      background: #f9fbfd;
+    }
+
+    nav a,
+    .print-button {
+      color: var(--blue);
+      border: 1px solid #c9d9e8;
+      background: #ffffff;
+      padding: 8px 11px;
+      border-radius: 6px;
+      text-decoration: none;
+      font-weight: 700;
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    main {
+      padding: 32px 48px 48px;
+    }
+
+    section {
+      margin: 0 0 34px;
+      break-inside: avoid;
+    }
+
+    h2 {
+      margin: 0 0 14px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--line);
+      font-size: 24px;
+      letter-spacing: 0;
+    }
+
+    h3 {
+      margin: 22px 0 8px;
+      font-size: 18px;
+    }
+
+    p {
+      margin: 0 0 12px;
+    }
+
+    ul,
+    ol {
+      margin: 8px 0 14px 22px;
+      padding: 0;
+    }
+
+    li {
+      margin: 5px 0;
+    }
+
+    .notice {
+      border-left: 5px solid var(--blue);
+      background: #eef5fb;
+      padding: 14px 16px;
+      margin: 14px 0;
+    }
+
+    .warning {
+      border-left-color: var(--amber);
+      background: #fff7e8;
+    }
+
+    .danger {
+      border-left-color: var(--red);
+      background: #fff0f0;
+    }
+
+    .summary-grid,
+    .scope-grid,
+    .roles-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+      margin: 16px 0;
+    }
+
+    .summary-card,
+    .scope-card,
+    .role-card {
+      border: 1px solid var(--line);
+      background: var(--soft);
+      padding: 15px;
+      border-radius: 8px;
+    }
+
+    .summary-card span,
+    .scope-card span,
+    .role-card span {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    .summary-card strong {
+      display: block;
+      margin-top: 8px;
+      font-size: 24px;
+      color: var(--blue);
+    }
+
+    .badge {
+      display: inline-block;
+      min-width: 82px;
+      text-align: center;
+      padding: 3px 8px;
+      border-radius: 999px;
+      color: #ffffff;
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .critical { background: var(--red); }
+    .high { background: var(--amber); }
+    .normal { background: var(--blue); }
+    .pass { background: var(--green); }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0 18px;
+      font-size: 14px;
+    }
+
+    th,
+    td {
+      vertical-align: top;
+      border: 1px solid var(--line);
+      padding: 9px 10px;
+      text-align: left;
+    }
+
+    th {
+      background: #eaf0f6;
+      font-weight: 700;
+    }
+
+    tbody tr:nth-child(even) td {
+      background: #fbfcfe;
+    }
+
+    .defect-log td {
+      height: 42px;
+    }
+
+    .test-case {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+      margin: 18px 0 22px;
+      break-inside: avoid;
+    }
+
+    .test-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: center;
+      padding: 13px 16px;
+      background: #edf3f8;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .test-head h3 {
+      margin: 0;
+      font-size: 17px;
+    }
+
+    .test-body {
+      padding: 14px 16px 16px;
+    }
+
+    .checklist {
+      list-style: none;
+      margin-left: 0;
+    }
+
+    .checklist li {
+      position: relative;
+      padding-left: 28px;
+      margin: 8px 0;
+    }
+
+    .checklist li::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 2px;
+      width: 16px;
+      height: 16px;
+      border: 1.8px solid #667789;
+      border-radius: 3px;
+      background: #ffffff;
+    }
+
+    .signature-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 14px;
+      margin-top: 16px;
+    }
+
+    .signature-box {
+      min-height: 92px;
+      border: 1px solid var(--line);
+      padding: 12px;
+      background: #fbfcfe;
+    }
+
+    .signature-line {
+      border-bottom: 1px solid #9aa8b6;
+      height: 38px;
+      margin-top: 14px;
+    }
+
+    code {
+      color: #20354b;
+      background: #edf3f8;
+      padding: 1px 5px;
+      border-radius: 4px;
+      font-family: Consolas, Monaco, monospace;
+      font-size: 0.95em;
+    }
+
+    @media (max-width: 860px) {
+      header,
+      nav,
+      main {
+        padding-left: 22px;
+        padding-right: 22px;
+      }
+
+      .meta-grid,
+      .summary-grid,
+      .scope-grid,
+      .roles-grid,
+      .signature-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .test-head {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+    }
+
+    @media print {
+      @page {
+        size: A4;
+        margin: 13mm;
+      }
+
+      html,
+      body {
+        background: #ffffff;
+      }
+
+      body {
+        font-size: 11.5pt;
+      }
+
+      .page {
+        width: auto;
+        margin: 0;
+        box-shadow: none;
+      }
+
+      header {
+        color-adjust: exact;
+        print-color-adjust: exact;
+        padding: 22mm 14mm 16mm;
+      }
+
+      nav,
+      .print-button {
+        display: none;
+      }
+
+      main {
+        padding: 10mm 0 0;
+      }
+
+      section {
+        page-break-inside: avoid;
+      }
+
+      h2 {
+        page-break-after: avoid;
+      }
+
+      .test-case {
+        page-break-inside: avoid;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header>
+      <p class="eyebrow">Pilot acceptance test document</p>
+      <h1>Custom QGroundControl Test Manual</h1>
+      <p class="subtitle">A practical flight-test checklist for validating the custom QGroundControl build from the local <strong>devel</strong> branch against the expected pilot-facing behavior.</p>
+
+      <div class="meta-grid">
+        <div class="meta-box">
+          <span>Branch under test</span>
+          <strong>devel</strong>
+        </div>
+        <div class="meta-box">
+          <span>Baseline</span>
+          <strong>master</strong>
+        </div>
+        <div class="meta-box">
+          <span>Prepared for</span>
+          <strong>Test pilot</strong>
+        </div>
+        <div class="meta-box">
+          <span>Revision date</span>
+          <strong>2026-05-12</strong>
+        </div>
+      </div>
+    </header>
+
+    <nav aria-label="Document sections">
+      <a href="#summary">Summary</a>
+      <a href="#safety">Safety</a>
+      <a href="#setup">Setup</a>
+      <a href="#matrix">Test Matrix</a>
+      <a href="#procedures">Procedures</a>
+      <a href="#defects">Defect Log</a>
+      <button class="print-button" type="button" onclick="window.print()">Print / Save PDF</button>
+    </nav>
+
+    <main>
+      <section id="summary">
+        <h2>1. Purpose And Scope</h2>
+        <p>This manual tells the pilot what to test, how to test it, and what result is expected. It focuses on the custom changes visible to pilots: HUD, FPV/Stribog interface selection, camera and gimbal behavior, terrain and altitude display, toolbar indicators, and basic operational safety.</p>
+
+        <div class="notice warning">
+          <strong>Branch note:</strong> local <code>devel</code> was reported as 5 commits behind <code>origin/devel</code>, and <code>master</code> also contains commits not present in <code>devel</code>. Record the exact application version and commit hash before testing.
+        </div>
+
+        <h3>Main Areas To Validate</h3>
+        <div class="scope-grid">
+          <div class="scope-card">
+            <span>Flight UI</span>
+            Custom HUD, FPV/Stribog layout, toolbar indicators, compass, altitude and terrain display.
+          </div>
+          <div class="scope-card">
+            <span>Camera and gimbal</span>
+            T20/SIYI gimbal slider, multi-camera FOV, camera discovery, video startup and stream switching.
+          </div>
+          <div class="scope-card">
+            <span>Mission and safety</span>
+            Map click behavior, guided controls, route display, telemetry, link status, battery status and fail-safe visibility.
+          </div>
+        </div>
+      </section>
+
+      <section id="safety">
+        <h2>2. Safety Rules</h2>
+        <div class="notice danger">
+          <strong>Do not begin flight testing until bench testing passes.</strong> Any crash, frozen UI, missing telemetry, wrong flight mode, wrong altitude, wrong heading, uncontrolled gimbal motion, or wrong camera feed is a stop condition.
+        </div>
+
+        <ul class="checklist">
+          <li>Use a safe test area with legal flight permission, weather limits, and clear emergency landing space.</li>
+          <li>Keep a manual joystick ready and verified before arming.</li>
+          <li>Use a visual observer when testing camera, FPV, or HUD changes.</li>
+          <li>Start with props removed for bench tests, then low-altitude hover, then normal mission tests.</li>
+          <li>Record screen video or logs for every failed test.</li>
+          <li>Stop testing immediately if QGroundControl displays inconsistent state compared with the vehicle.</li>
+        </ul>
+      </section>
+
+      <section id="setup">
+        <h2>3. Test Setup</h2>
+        <h3>Required Equipment</h3>
+        <table class="defect-log">
+          <thead>
+            <tr>
+              <th>Item</th>
+              <th>Purpose</th>
+              <th>Record Value</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Custom QGroundControl build</td>
+              <td>Application under test</td>
+              <td>Version / commit hash:</td>
+            </tr>
+            <tr>
+              <td>Vehicle</td>
+              <td>Flight platform for validation</td>
+              <td>Model / firmware:</td>
+            </tr>
+            <tr>
+              <td>Camera payload</td>
+              <td>Video, FOV and gimbal validation</td>
+              <td>Camera type:</td>
+            </tr>
+            <tr>
+              <td>Gimbal</td>
+              <td>T20/SIYI slider and control validation</td>
+              <td>Gimbal type:</td>
+            </tr>
+            <tr>
+              <td>Ground station device</td>
+              <td>Display and control device</td>
+              <td>OS / screen size:</td>
+            </tr>
+            <tr>
+              <td>Telemetry link</td>
+              <td>Vehicle data and command link</td>
+              <td>Radio / network type:</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>Before Each Test Session</h3>
+        <ul class="checklist">
+          <li>Confirm application starts without crash or blocking error dialog.</li>
+          <li>Confirm correct build is installed and the version popup or about window shows the expected version/hash.</li>
+          <li>Confirm vehicle connects and shows correct vehicle type, flight mode, battery, GPS and link state.</li>
+          <li>Confirm map tiles or offline map data are available for the test area.</li>
+          <li>Confirm video source and gimbal payload are powered and connected.</li>
+          <li>Start screen recording if available.</li>
+        </ul>
+
+        <h3>Pilot UI Setup Click Paths</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Task</th>
+              <th>What To Click</th>
+              <th>Expected Result</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Show the AGL terrain UI element</td>
+              <td>
+                Open <strong>Fly View</strong>. In the bottom-right instrument panel, <strong>right-click</strong> the instrument on desktop, or <strong>long-press</strong> it on a touch device. Open the selector and choose <strong>AGL</strong>. Click the lock/open button to close the selector.
+              </td>
+              <td>The bottom-right instrument changes to the AGL terrain profile and shows height above ground/terrain information when terrain data is available.</td>
+            </tr>
+            <tr>
+              <td>Force FPV layout manually</td>
+              <td>
+                Open <strong>Application Settings</strong> using the gear icon. Select <strong>General</strong>. Find <strong>UI Layout</strong>. Select <strong>FPV</strong>.
+              </td>
+              <td>The Fly View changes to the FPV layout with the custom edge controls visible.</td>
+            </tr>
+            <tr>
+              <td>Use Stribog / normal layout manually</td>
+              <td>
+                Open <strong>Application Settings</strong> using the gear icon. Select <strong>General</strong>. Find <strong>UI Layout</strong>. Select <strong>Normal</strong>. If this build labels the option as <strong>Stribog</strong> instead of <strong>Normal</strong>, select <strong>Stribog</strong>.
+              </td>
+              <td>The Fly View returns to the non-FPV layout used for the standard/Stribog pilot workflow.</td>
+            </tr>
+            <tr>
+              <td>Use automatic layout switching</td>
+              <td>
+                Open <strong>Application Settings</strong> using the gear icon. Select <strong>General</strong>. Find <strong>UI Layout</strong>. Select <strong>Auto</strong>, then connect the vehicle.
+              </td>
+              <td>QGroundControl selects the custom FPV layout only when the connected vehicle metadata identifies the vehicle as an FPV model; otherwise it stays in the normal/Stribog layout.</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="matrix">
+        <h2>4. Test Matrix</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Area</th>
+              <th>Priority</th>
+              <th>When To Run</th>
+              <th>Pass Criteria</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>T01</td>
+              <td>Install and launch</td>
+              <td><span class="badge critical">Critical</span></td>
+              <td>Every build</td>
+              <td>App opens, version is visible, no startup crash.</td>
+            </tr>
+            <tr>
+              <td>T02</td>
+              <td>Vehicle connection and telemetry</td>
+              <td><span class="badge critical">Critical</span></td>
+              <td>Bench and flight</td>
+              <td>Vehicle state matches real vehicle and updates continuously.</td>
+            </tr>
+            <tr>
+              <td>T03</td>
+              <td>Automatic UI switching</td>
+              <td><span class="badge high">High</span></td>
+              <td>Bench</td>
+              <td>Correct FPV/Stribog UI appears for selected or detected model.</td>
+            </tr>
+            <tr>
+              <td>T04</td>
+              <td>Custom HUD</td>
+              <td><span class="badge critical">Critical</span></td>
+              <td>Bench and flight</td>
+              <td>Heading, altitude, terrain and attitude are readable and correct.</td>
+            </tr>
+            <tr>
+              <td>T05</td>
+              <td>Compass and azimuth</td>
+              <td><span class="badge high">High</span></td>
+              <td>Bench and flight</td>
+              <td>Compass direction and azimuth values are stable and plausible.</td>
+            </tr>
+            <tr>
+              <td>T06</td>
+              <td>Terrain and AGL indication</td>
+              <td><span class="badge high">High</span></td>
+              <td>Bench and low flight</td>
+              <td>Terrain indicator loads data and does not show misleading values.</td>
+            </tr>
+            <tr>
+              <td>T07</td>
+              <td>Camera discovery and video</td>
+              <td><span class="badge critical">Critical</span></td>
+              <td>Bench and flight</td>
+              <td>Correct camera feed appears and recovers after reconnect.</td>
+            </tr>
+            <tr>
+              <td>T08</td>
+              <td>Multi-camera FOV</td>
+              <td><span class="badge high">High</span></td>
+              <td>Bench and flight</td>
+              <td>FOV changes match selected camera and gimbal orientation.</td>
+            </tr>
+            <tr>
+              <td>T09</td>
+              <td>T20/SIYI gimbal slider</td>
+              <td><span class="badge critical">Critical</span></td>
+              <td>Bench before flight</td>
+              <td>Slider motion is smooth, bounded and matches gimbal movement.</td>
+            </tr>
+            <tr>
+              <td>T10</td>
+              <td>Toolbar indicators</td>
+              <td><span class="badge high">High</span></td>
+              <td>Bench and flight</td>
+              <td>Battery, flight mode, link, GPS and remote state are visible and correct.</td>
+            </tr>
+            <tr>
+              <td>T11</td>
+              <td>Map interaction</td>
+              <td><span class="badge normal">Normal</span></td>
+              <td>Bench and flight</td>
+              <td>Detached map clicks and zoom actions do not trigger wrong actions.</td>
+            </tr>
+            <tr>
+              <td>T12</td>
+              <td>Regression smoke test</td>
+              <td><span class="badge critical">Critical</span></td>
+              <td>Before release</td>
+              <td>Arm, mode change, takeoff, land, video, logs and settings all work.</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="procedures">
+        <h2>5. Test Procedures</h2>
+
+        <article class="test-case">
+          <div class="test-head">
+            <h3>T01 - Install, Launch And Version Check</h3>
+            <span class="badge critical">Critical</span>
+          </div>
+          <div class="test-body">
+            <p><strong>Goal:</strong> Confirm the pilot is testing the correct custom build.</p>
+            <ol>
+              <li>Install or start the custom QGroundControl build.</li>
+              <li>Open the version/about information or version popup.</li>
+              <li>Record the branch, version, build date and commit hash if shown.</li>
+              <li>Close and reopen the application.</li>
+            </ol>
+            <p><strong>Expected result:</strong> QGroundControl starts cleanly every time. The version information is visible and identifies the intended custom build.</p>
+            <p><strong>Fail if:</strong> the app crashes, hangs, shows missing dependency errors, or version/hash cannot be confirmed.</p>
+          </div>
+        </article>
+
+        <article class="test-case">
+          <div class="test-head">
+            <h3>T02 - Vehicle Connection And Telemetry</h3>
+            <span class="badge critical">Critical</span>
+          </div>
+          <div class="test-body">
+            <p><strong>Goal:</strong> Confirm QGroundControl correctly detects and tracks the vehicle.</p>
+            <ol>
+              <li>Connect telemetry with the vehicle disarmed.</li>
+              <li>Verify vehicle type, firmware type, flight mode, armed state, battery and GPS status.</li>
+              <li>Move or rotate the vehicle by hand during bench test.</li>
+              <li>Disconnect and reconnect the telemetry link.</li>
+            </ol>
+            <p><strong>Expected result:</strong> values update continuously, reconnect works, and no stale armed/mode/battery/GPS state remains after reconnect.</p>
+            <p><strong>Flight check:</strong> during hover, compare displayed altitude, heading and mode with the RC/controller or autopilot source.</p>
+          </div>
+        </article>
+
+        <article class="test-case">
+          <div class="test-head">
+            <h3>T03 - Automatic FPV / Stribog UI Switching</h3>
+            <span class="badge high">High</span>
+          </div>
+          <div class="test-body">
+            <p><strong>Goal:</strong> Validate the custom UI selection behavior from the <code>feat/initial_auto_switch</code> and <code>unify/fpv_stribog_unify</code> changes.</p>
+            <ol>
+              <li>Start QGroundControl with no vehicle connected and note the default UI.</li>
+              <li>Connect each supported test vehicle/model one at a time.</li>
+              <li>Observe whether the correct FPV or Stribog layout appears automatically.</li>
+              <li>Open <strong>Application Settings</strong> with the gear icon, select <strong>General</strong>, then use <strong>UI Layout</strong> to test <strong>Normal</strong>, <strong>Auto</strong>, and <strong>FPV</strong>.</li>
+              <li>If the non-FPV option is labeled <strong>Stribog</strong> on the tested build, use <strong>Stribog</strong> where this manual says <strong>Normal</strong>.</li>
+              <li>Return <strong>UI Layout</strong> to the expected release setting before flight, normally <strong>Auto</strong> unless the test plan says otherwise.</li>
+            </ol>
+            <p><strong>Expected result:</strong> the correct UI appears for the selected or detected vehicle model. Manual selection persists after restart if that is intended.</p>
+            <p><strong>Fail if:</strong> the wrong UI appears, switching requires app restart unexpectedly, or controls disappear after model selection.</p>
+          </div>
+        </article>
+
+        <article class="test-case">
+          <div class="test-head">
+            <h3>T04 - Custom HUD Readability And Correctness</h3>
+            <span class="badge critical">Critical</span>
+          </div>
+          <div class="test-body">
+            <p><strong>Goal:</strong> Validate custom HUD, compass, altitude and terrain presentation.</p>
+            <ol>
+              <li>Open Fly View with video disabled, then enabled.</li>
+              <li>Check that HUD text and indicators are readable on the ground station screen in sunlight or expected field lighting.</li>
+              <li>Pitch, roll and yaw the vehicle by hand with props removed.</li>
+              <li>During low hover, check attitude, altitude, vertical movement and heading behavior.</li>
+              <li>Change map/video layout if available and confirm the HUD remains readable.</li>
+            </ol>
+            <p><strong>Expected result:</strong> HUD elements do not overlap, flicker, vanish or cover critical controls. Heading, altitude and attitude match vehicle movement.</p>
+            <p><strong>Fail if:</strong> the HUD shows misleading values, unreadable text, unstable scaling, clipped labels, or wrong orientation.</p>
+          </div>
+        </article>
+
+        <article class="test-case">
+          <div class="test-head">
+            <h3>T05 - Compass, Azimuth And Heading</h3>
+            <span class="badge high">High</span>
+          </div>
+          <div class="test-body">
+            <p><strong>Goal:</strong> Confirm the compass resize, scaling and azimuth fixes behave correctly.</p>
+            <ol>
+              <li>Place the vehicle facing north, east, south and west if practical.</li>
+              <li>Compare QGroundControl heading with an independent compass or autopilot status.</li>
+              <li>Rotate slowly through 360 degrees and watch for jumps or wraparound errors.</li>
+              <li>Repeat once with the video/HUD overlay active.</li>
+            </ol>
+            <p><strong>Expected result:</strong> heading changes smoothly, numeric azimuth is readable, and the compass stays correctly sized.</p>
+          </div>
+        </article>
+
+        <article class="test-case">
+          <div class="test-head">
+            <h3>T06 - Terrain And AGL Indicator</h3>
+            <span class="badge high">High</span>
+          </div>
+          <div class="test-body">
+            <p><strong>Goal:</strong> Validate offline terrain elevation and dynamic terrain indicator changes.</p>
+            <ol>
+              <li>Load the map for the test area before flight.</li>
+              <li>Open <strong>Fly View</strong>.</li>
+              <li>In the bottom-right instrument panel, <strong>right-click</strong> the instrument on desktop, or <strong>long-press</strong> it on a touch device.</li>
+              <li>Open the selector and choose <strong>AGL</strong>. Click the lock/open button to close the selector.</li>
+              <li>Confirm the AGL terrain indicator appears in the bottom-right instrument area.</li>
+              <li>Test with network available, then with network disabled if offline terrain is expected.</li>
+              <li>During low flight, compare AGL trend with expected terrain changes.</li>
+            </ol>
+            <p><strong>Expected result:</strong> terrain data loads without freezing the UI. The indicator clearly shows unknown/unavailable data instead of a misleading value.</p>
+            <p><strong>Fail if:</strong> terrain values jump unrealistically, remain stuck, or make the pilot believe the vehicle is safer than it is.</p>
+          </div>
+        </article>
+
+        <article class="test-case">
+          <div class="test-head">
+            <h3>T07 - Camera Discovery, Video And Reconnect</h3>
+            <span class="badge critical">Critical</span>
+          </div>
+          <div class="test-body">
+            <p><strong>Goal:</strong> Confirm camera discovery and video display are stable.</p>
+            <ol>
+              <li>Start QGroundControl before powering the camera payload.</li>
+              <li>Power the payload and wait for camera discovery.</li>
+              <li>Confirm video starts on the expected camera feed.</li>
+              <li>Switch cameras or streams if multiple feeds are available.</li>
+              <li>Power-cycle the payload or disconnect/reconnect the stream.</li>
+            </ol>
+            <p><strong>Expected result:</strong> video starts, selected feed is correct, reconnect works, and the app does not crash on camera loss.</p>
+            <p><strong>Fail if:</strong> video is black without a clear state, wrong feed is selected, reconnect requires full application restart, or controls become unresponsive.</p>
+          </div>
+        </article>
+
+        <article class="test-case">
+          <div class="test-head">
+            <h3>T08 - Multi-Camera FOV And Gimbal FOV</h3>
+            <span class="badge high">High</span>
+          </div>
+          <div class="test-body">
+            <p><strong>Goal:</strong> Validate the <code>feat/auto_fov</code> changes for multi-camera FOV handling.</p>
+            <ol>
+              <li>Select each available camera feed.</li>
+              <li>Observe FOV overlay, framing or map/video FOV indicator if available.</li>
+              <li>Move the gimbal through pan and tilt ranges.</li>
+              <li>Zoom or switch lens/FOV mode if supported by the payload.</li>
+            </ol>
+            <p><strong>Expected result:</strong> FOV updates correspond to the active camera and gimbal direction. Switching cameras does not leave stale FOV data from a previous camera.</p>
+          </div>
+        </article>
+
+        <article class="test-case">
+          <div class="test-head">
+            <h3>T09 - T20 / SIYI Gimbal Slider</h3>
+            <span class="badge critical">Critical</span>
+          </div>
+          <div class="test-body">
+            <p><strong>Goal:</strong> Validate gimbal slider movement and axis guard behavior.</p>
+            <ol>
+              <li>Run this test on the bench before any flight.</li>
+              <li>Move the slider slowly from center to each limit.</li>
+              <li>Release the slider and confirm the gimbal stops as expected.</li>
+              <li>Move the slider quickly and check for delayed or excessive motion.</li>
+              <li>Repeat while video is active and while telemetry quality is reduced, if safe to simulate.</li>
+            </ol>
+            <p><strong>Expected result:</strong> the gimbal moves in the correct direction, respects limits, stops reliably, and does not command the wrong axis.</p>
+            <p><strong>Fail if:</strong> the gimbal moves unexpectedly, oscillates, ignores limits, uses the wrong axis, or keeps moving after control release.</p>
+          </div>
+        </article>
+
+        <article class="test-case">
+          <div class="test-head">
+            <h3>T10 - Toolbar Indicators</h3>
+            <span class="badge high">High</span>
+          </div>
+          <div class="test-body">
+            <p><strong>Goal:</strong> Confirm new or moved toolbar indicators remain clear and correct.</p>
+            <ol>
+              <li>Check battery, flight mode, armed state, GPS, telemetry RSSI, link and gimbal indicators.</li>
+              <li>Open each indicator panel and close it again.</li>
+              <li>Change flight mode from the normal pilot workflow.</li>
+              <li>Simulate weak GPS or telemetry loss if safe and controlled.</li>
+            </ol>
+            <p><strong>Expected result:</strong> indicators show correct state, panels fit on screen, and controls do not block important flight information.</p>
+          </div>
+        </article>
+
+        <article class="test-case">
+          <div class="test-head">
+            <h3>T11 - Map Interaction And Detached Map Clicks</h3>
+            <span class="badge normal">Normal</span>
+          </div>
+          <div class="test-body">
+            <p><strong>Goal:</strong> Confirm map clicks and layout changes do not cause unintended actions.</p>
+            <ol>
+              <li>Open Fly View and interact with the map using click, drag and zoom.</li>
+              <li>Switch between video-focused and map-focused layouts if available.</li>
+              <li>Open and close guided action menus.</li>
+              <li>Verify clicking detached map areas does not trigger wrong buttons or commands.</li>
+            </ol>
+            <p><strong>Expected result:</strong> map interactions are predictable and do not arm, change mode, move gimbal or execute guided actions by accident.</p>
+          </div>
+        </article>
+
+        <article class="test-case">
+          <div class="test-head">
+            <h3>T12 - End-To-End Flight Smoke Test</h3>
+            <span class="badge critical">Critical</span>
+          </div>
+          <div class="test-body">
+            <p><strong>Goal:</strong> Confirm the custom build is usable for a normal pilot workflow.</p>
+            <ol>
+              <li>Connect vehicle, telemetry, camera and gimbal.</li>
+              <li>Verify pre-arm status, battery, GPS and link quality.</li>
+              <li>Arm using the approved pilot procedure.</li>
+              <li>Take off to a safe low altitude.</li>
+              <li>Hover and check HUD, map, video, gimbal, FOV and toolbar indicators.</li>
+              <li>Change to one approved flight mode and back.</li>
+              <li>Land and disarm.</li>
+              <li>Confirm logs, screenshots or screen recording are saved if required.</li>
+            </ol>
+            <p><strong>Expected result:</strong> no critical UI, telemetry, camera, gimbal or control regression appears during the basic flight workflow.</p>
+          </div>
+        </article>
+      </section>
+
+      <section id="defects">
+        <h2>6. Defect Log</h2>
+        <p>Use this table during the test session. Attach screenshots, video timestamps, QGroundControl logs and autopilot logs where possible.</p>
+        <table>
+          <thead>
+            <tr>
+              <th>Test ID</th>
+              <th>Pass / Fail</th>
+              <th>Issue Description</th>
+              <th>Evidence</th>
+              <th>Severity</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>T01</td>
+              <td>&nbsp;</td>
+              <td>&nbsp;</td>
+              <td>&nbsp;</td>
+              <td>&nbsp;</td>
+            </tr>
+            <tr>
+              <td>T02</td>
+              <td>&nbsp;</td>
+              <td>&nbsp;</td>
+              <td>&nbsp;</td>
+              <td>&nbsp;</td>
+            </tr>
+            <tr>
+              <td>T03</td>
+              <td>&nbsp;</td>
+              <td>&nbsp;</td>
+              <td>&nbsp;</td>
+              <td>&nbsp;</td>
+            </tr>
+            <tr>
+              <td>T04</td>
+              <td>&nbsp;</td>
+              <td>&nbsp;</td>
+              <td>&nbsp;</td>
+              <td>&nbsp;</td>
+            </tr>
+            <tr>
+              <td>T05</td>
+              <td>&nbsp;</td>
+              <td>&nbsp;</td>
+              <td>&nbsp;</td>
+              <td>&nbsp;</td>
+            </tr>
+            <tr>
+              <td>T06</td>
+              <td>&nbsp;</td>
+              <td>&nbsp;</td>
+              <td>&nbsp;</td>
+              <td>&nbsp;</td>
+            </tr>
+            <tr>
+              <td>T07</td>
+              <td>&nbsp;</td>
+              <td>&nbsp;</td>
+              <td>&nbsp;</td>
+              <td>&nbsp;</td>
+            </tr>
+            <tr>
+              <td>T08</td>
+              <td>&nbsp;</td>
+              <td>&nbsp;</td>
+              <td>&nbsp;</td>
+              <td>&nbsp;</td>
+            </tr>
+            <tr>
+              <td>T09</td>
+              <td>&nbsp;</td>
+              <td>&nbsp;</td>
+              <td>&nbsp;</td>
+              <td>&nbsp;</td>
+            </tr>
+            <tr>
+              <td>T10</td>
+              <td>&nbsp;</td>
+              <td>&nbsp;</td>
+              <td>&nbsp;</td>
+              <td>&nbsp;</td>
+            </tr>
+            <tr>
+              <td>T11</td>
+              <td>&nbsp;</td>
+              <td>&nbsp;</td>
+              <td>&nbsp;</td>
+              <td>&nbsp;</td>
+            </tr>
+            <tr>
+              <td>T12</td>
+              <td>&nbsp;</td>
+              <td>&nbsp;</td>
+              <td>&nbsp;</td>
+              <td>&nbsp;</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>7. Pilot Sign-Off</h2>
+        <div class="roles-grid">
+          <div class="role-card">
+            <span>Recommended result</span>
+            <strong class="badge pass">Pass</strong>
+            Build is acceptable for the next test stage.
+          </div>
+          <div class="role-card">
+            <span>Conditional result</span>
+            <strong class="badge high">Retest</strong>
+            Minor issues found. Fix and repeat affected tests.
+          </div>
+          <div class="role-card">
+            <span>Blocked result</span>
+            <strong class="badge critical">Fail</strong>
+            Safety, control, telemetry, video or gimbal issue found.
+          </div>
+        </div>
+
+        <div class="signature-grid">
+          <div class="signature-box">
+            <strong>Test Pilot Name</strong>
+            <div class="signature-line"></div>
+            Date:
+          </div>
+          <div class="signature-box">
+            <strong>Reviewer / Engineer Name</strong>
+            <div class="signature-line"></div>
+            Date:
+          </div>
+        </div>
+      </section>
+    </main>
+
+  </div>
+</body>
+</html>
