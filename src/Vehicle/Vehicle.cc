@@ -90,7 +90,8 @@ QGC_LOGGING_CATEGORY(VehicleLog, "VehicleLog")
 #define MAV_TYPE_ILLUMINATOR_CUSTOM 44
 #define MAV_CMD_ILLUMINATOR_ON_OFF_CUSTOM 405
 #define MAVLINK_MSG_ID_ILLUMINATOR_STATUS_CUSTOM 440
-#define ILLUMINATOR_STATUS_ENABLE_PAYLOAD_OFFSET 32
+static constexpr uint8_t kIlluminatorStatusEnablePayloadOffset = 32;
+static constexpr uint8_t kIlluminatorStatusEnablePayloadLength = kIlluminatorStatusEnablePayloadOffset + sizeof(uint8_t);
 float gstreamWidth;
 float gstreamHeight;
 //FPV
@@ -2801,27 +2802,14 @@ void Vehicle::requestIlluminatorStatus()
     sendMessageOnLinkThreadSafe(sharedLink.get(), msg);
 }
 
-void Vehicle::_requestIlluminatorStatusResultHandler(void* resultHandlerData, MAV_RESULT result, RequestMessageResultHandlerFailureCode_t failureCode, const mavlink_message_t& message)
-{
-    auto vehicle = static_cast<Vehicle*>(resultHandlerData);
-    if (!vehicle) {
-        return;
-    }
-
-    vehicle->_illuminatorStatusRequestPending = false;
-    if (result == MAV_RESULT_ACCEPTED && failureCode == RequestMessageNoFailure && message.msgid == MAVLINK_MSG_ID_ILLUMINATOR_STATUS_CUSTOM) {
-        vehicle->_handleIlluminatorStatus(message);
-    }
-}
-
 void Vehicle::_handleIlluminatorStatus(const mavlink_message_t& message)
 {
-    if (message.compid != ILLUMINATOR_COMPONENT_ID || message.len <= ILLUMINATOR_STATUS_ENABLE_PAYLOAD_OFFSET) {
+    if (message.compid != ILLUMINATOR_COMPONENT_ID || message.len < kIlluminatorStatusEnablePayloadLength) {
         return;
     }
 
-    const uint8_t enable = _MAV_RETURN_uint8_t(&message, ILLUMINATOR_STATUS_ENABLE_PAYLOAD_OFFSET);
-    _illuminatorStatusRequestPending = false;
+    // This custom message is not available in QGC's generated MAVLink headers, so read the enable field by wire offset.
+    const uint8_t enable = _MAV_RETURN_uint8_t(&message, kIlluminatorStatusEnablePayloadOffset);
     _setIlluminatorAvailable(true);
     _setIlluminatorEnabled(enable != 0, true);
 }

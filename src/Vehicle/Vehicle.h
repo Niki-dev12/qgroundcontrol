@@ -1156,7 +1156,6 @@ private:
     bool            _illuminatorAvailable                   = false;
     bool            _illuminatorEnabled                     = false;
     bool            _illuminatorStatusKnown                 = false;
-    bool            _illuminatorStatusRequestPending        = false;
     int             _illuminatorSystemId                    = -1;
     bool            _allSensorsHealthy                      = true;
     bool            _mavlinkSigning                         = false;
@@ -1440,7 +1439,6 @@ private:
     void _handleControlStatus(const mavlink_message_t& message);
     void _handleCommandRequestOperatorControl(const mavlink_command_long_t commandLong);
     static void _requestOperatorControlAckHandler(void* resultHandlerData, int compId, const mavlink_command_ack_t& ack, MavCmdResultFailureCode_t failureCode);
-    static void _requestIlluminatorStatusResultHandler(void* resultHandlerData, MAV_RESULT result, RequestMessageResultHandlerFailureCode_t failureCode, const mavlink_message_t& message);
     void _setIlluminatorAvailable(bool available);
     void _setIlluminatorEnabled(bool enabled, bool statusKnown);
 
