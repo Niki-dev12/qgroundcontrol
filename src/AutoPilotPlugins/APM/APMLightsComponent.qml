@@ -61,9 +61,6 @@ SetupPage {
             readonly property int   _mavCmdIlluminatorOnOff:        405
             readonly property int   _mavResultAccepted:             0
 
-            property bool _illuminatorEnabled:      false
-            property bool _illuminatorCommandBusy:  false
-            property bool _illuminatorPendingState: false
             property string _illuminatorCommandStatusText: ""
             property string _illuminatorStatusText: _illuminatorCommandStatusText.length > 0 ? _illuminatorCommandStatusText :
                                                     (_activeVehicle.illuminatorAvailable ?
@@ -82,14 +79,12 @@ SetupPage {
             }
 
             function setIlluminatorEnabled(enabled) {
-                _illuminatorPendingState = enabled
-                _illuminatorCommandBusy = true
+                // Commands are sent optimistically; the switch state is corrected by the next status message.
+                // If rapid repeated clicks cause stale state, add a bounded ACK/status timeout here.
                 if (_activeVehicle.sendIlluminatorOnOff(enabled)) {
-                    _illuminatorCommandBusy = false
                     _illuminatorCommandStatusText = enabled ? qsTr("Lights on command sent") : qsTr("Lights off command sent")
                     _activeVehicle.requestIlluminatorStatus()
                 } else {
-                    _illuminatorCommandBusy = false
                     _illuminatorCommandStatusText = qsTr("Unable to send illuminator command")
                 }
             }
@@ -189,7 +184,6 @@ SetupPage {
                         return
                     }
 
-                    _illuminatorCommandBusy = false
                     if (ackResult === _mavResultAccepted) {
                         _activeVehicle.requestIlluminatorStatus()
                     } else {
@@ -198,8 +192,7 @@ SetupPage {
                 }
 
                 function onIlluminatorChanged() {
-                    if (!_illuminatorCommandBusy || _activeVehicle.illuminatorStatusKnown) {
-                        _illuminatorCommandBusy = false
+                    if (_activeVehicle.illuminatorStatusKnown) {
                         _illuminatorCommandStatusText = ""
                     }
                 }
@@ -234,14 +227,12 @@ SetupPage {
                             id:                 illuminatorSwitch
                             text:               qsTr("Here4 and indicator LEDs")
                             checked:            _activeVehicle.illuminatorStatusKnown && _activeVehicle.illuminatorEnabled
-                            enabled:            !_illuminatorCommandBusy
 
                             onClicked: setIlluminatorEnabled(checked)
                         }
 
                         QGCButton {
                             text:       qsTr("Refresh")
-                            enabled:    !_illuminatorCommandBusy
                             onClicked:  _activeVehicle.requestIlluminatorStatus()
                         }
                     }
