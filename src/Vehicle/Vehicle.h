@@ -219,6 +219,10 @@ public:
     Q_PROPERTY(CheckList            checkListState              READ checkListState             WRITE setCheckListState             NOTIFY checkListStateChanged)
     Q_PROPERTY(bool                 readyToFlyAvailable         READ readyToFlyAvailable                                            NOTIFY readyToFlyAvailableChanged)  ///< true: readyToFly signalling is available on this vehicle
     Q_PROPERTY(bool                 readyToFly                  READ readyToFly                                                     NOTIFY readyToFlyChanged)
+    Q_PROPERTY(bool                 illuminatorAvailable        READ illuminatorAvailable                                           NOTIFY illuminatorChanged)
+    Q_PROPERTY(bool                 illuminatorEnabled          READ illuminatorEnabled                                             NOTIFY illuminatorChanged)
+    Q_PROPERTY(bool                 illuminatorStatusKnown      READ illuminatorStatusKnown                                         NOTIFY illuminatorChanged)
+    Q_PROPERTY(QString              illuminatorTarget           READ illuminatorTarget                                              NOTIFY illuminatorChanged)
     Q_PROPERTY(QObject*             sysStatusSensorInfo         READ sysStatusSensorInfo                                            CONSTANT)
     Q_PROPERTY(bool                 allSensorsHealthy           READ allSensorsHealthy                                              NOTIFY allSensorsHealthyChanged)    //< true: all sensors in SYS_STATUS reported as healthy
     Q_PROPERTY(bool                 requiresGpsFix              READ requiresGpsFix                                                 NOTIFY requiresGpsFixChanged)
@@ -633,6 +637,10 @@ public:
     QGCMapCircle*   orbitMapCircle              () { return &_orbitMapCircle; }
     bool            readyToFlyAvailable         () const{ return _readyToFlyAvailable; }
     bool            readyToFly                  () const{ return _readyToFly; }
+    bool            illuminatorAvailable        () const{ return _illuminatorAvailable; }
+    bool            illuminatorEnabled          () const{ return _illuminatorEnabled; }
+    bool            illuminatorStatusKnown      () const{ return _illuminatorStatusKnown; }
+    QString         illuminatorTarget           () const{ return QStringLiteral("sysid %1, compid %2").arg(_illuminatorSystemId >= 0 ? _illuminatorSystemId : _id).arg(36); }
     bool            allSensorsHealthy           () const{ return _allSensorsHealthy; }
     QObject*        sysStatusSensorInfo         () { return &_sysStatusSensorInfo; }
     bool            requiresGpsFix              () const { return static_cast<bool>(_onboardControlSensorsPresent & QGCMAVLink::SysStatusSensorGPS); }
@@ -713,6 +721,10 @@ public:
 
     /// Same as sendMavCommand but available from Qml.
     Q_INVOKABLE void sendCommand(int compId, int command, bool showError, double param1 = 0.0, double param2 = 0.0, double param3 = 0.0, double param4 = 0.0, double param5 = 0.0, double param6 = 0.0, double param7 = 0.0);
+
+    /// Send MAV_CMD_ILLUMINATOR_ON_OFF to the standard illuminator component.
+    Q_INVOKABLE bool sendIlluminatorOnOff(bool enabled);
+    Q_INVOKABLE void requestIlluminatorStatus();
 
     typedef enum {
         MavCmdResultCommandResultOnly,          ///< commandResult specifies full success/fail info
@@ -887,6 +899,7 @@ signals:
     void coordinateChanged              (QGeoCoordinate coordinate);
     void joystickEnabledChanged         (bool enabled);
     void mavlinkMessageReceived         (const mavlink_message_t& message);
+    void illuminatorChanged             ();
     void homePositionChanged            (const QGeoCoordinate& homePosition);
     void armedPositionChanged();
     void armedChanged                   (bool armed);
@@ -1024,6 +1037,8 @@ private:
     void _handlePing                    (LinkInterface* link, mavlink_message_t& message);
     void _handleHomePosition            (mavlink_message_t& message);
     void _handleHeartbeat               (mavlink_message_t& message);
+    void _handleIlluminatorStatus       (const mavlink_message_t& message);
+    bool _isIlluminatorMessage          (const mavlink_message_t& message) const;
     void _handleCurrentMode             (mavlink_message_t& message);
     void _handleRadioStatus             (mavlink_message_t& message);
     void _handleRCChannels              (mavlink_message_t& message);
@@ -1138,6 +1153,10 @@ private:
     CheckList       _checkListState                         = CheckListNotSetup;
     bool            _readyToFlyAvailable                    = false;
     bool            _readyToFly                             = false;
+    bool            _illuminatorAvailable                   = false;
+    bool            _illuminatorEnabled                     = false;
+    bool            _illuminatorStatusKnown                 = false;
+    int             _illuminatorSystemId                    = -1;
     bool            _allSensorsHealthy                      = true;
     bool            _mavlinkSigning                         = false;
 
@@ -1420,6 +1439,8 @@ private:
     void _handleControlStatus(const mavlink_message_t& message);
     void _handleCommandRequestOperatorControl(const mavlink_command_long_t commandLong);
     static void _requestOperatorControlAckHandler(void* resultHandlerData, int compId, const mavlink_command_ack_t& ack, MavCmdResultFailureCode_t failureCode);
+    void _setIlluminatorAvailable(bool available);
+    void _setIlluminatorEnabled(bool enabled, bool statusKnown);
 
     Q_PROPERTY(uint8_t sysidInControl                        READ sysidInControl                        NOTIFY gcsControlStatusChanged)
     Q_PROPERTY(bool    gcsControlStatusFlags_SystemManager   READ gcsControlStatusFlags_SystemManager   NOTIFY gcsControlStatusChanged)

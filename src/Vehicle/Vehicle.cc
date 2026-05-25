@@ -86,6 +86,12 @@ QGC_LOGGING_CATEGORY(VehicleLog, "VehicleLog")
 #define COMPONENT_ID_USER 25  // av-tagging
 #define COMPONENT_CAM_ID 100  // av-fpv-vision
 #define AV_FPV "AV_FPV"
+#define ILLUMINATOR_COMPONENT_ID 36
+#define MAV_TYPE_ILLUMINATOR_CUSTOM 44
+#define MAV_CMD_ILLUMINATOR_ON_OFF_CUSTOM 405
+#define MAVLINK_MSG_ID_ILLUMINATOR_STATUS_CUSTOM 440
+static constexpr uint8_t kIlluminatorStatusEnablePayloadOffset = 32;
+static constexpr uint8_t kIlluminatorStatusEnablePayloadLength = kIlluminatorStatusEnablePayloadOffset + sizeof(uint8_t);
 float gstreamWidth;
 float gstreamHeight;
 //FPV
@@ -476,11 +482,11 @@ void Vehicle::_mavlinkMessageReceived(LinkInterface* link, mavlink_message_t mes
         qCDebug(VehicleLog) << "_mavlinkMessageReceived Link already running Mavlink v2. Setting _maxProtoVersion" << _maxProtoVersion;
     }
 
-    if (message.sysid != _id && message.sysid != 0) {
-        // We allow RADIO_STATUS messages which come from a link the vehicle is using to pass through and be handled
-        if (!(message.msgid == MAVLINK_MSG_ID_RADIO_STATUS && _vehicleLinkManager->containsLink(link))) {
-            return;
-        }
+    const bool messageFromThisVehicle = message.sysid == _id || message.sysid == 0;
+    const bool radioStatusForVehicleLink = message.msgid == MAVLINK_MSG_ID_RADIO_STATUS && _vehicleLinkManager->containsLink(link);
+
+    if (!messageFromThisVehicle && !_isIlluminatorMessage(message) && !radioStatusForVehicleLink) {
+        return;
     }
 
     // We give the link manager first whack since it it reponsible for adding new links
@@ -664,6 +670,9 @@ void Vehicle::_mavlinkMessageReceived(LinkInterface* link, mavlink_message_t mes
         _handleMessageInterval(message);
         break;
     }
+    case MAVLINK_MSG_ID_ILLUMINATOR_STATUS_CUSTOM:
+        _handleIlluminatorStatus(message);
+        break;
     case MAVLINK_MSG_ID_CONTROL_STATUS:
         _handleControlStatus(message);
         break;   
@@ -1584,13 +1593,25 @@ void Vehicle::setActuatorsMetadata([[maybe_unused]] uint8_t compid,
 
 void Vehicle::_handleHeartbeat(mavlink_message_t& message)
 {
-    if (message.compid != _defaultComponentId) {
-        return;
-    }
-
     mavlink_heartbeat_t heartbeat;
 
     mavlink_msg_heartbeat_decode(&message, &heartbeat);
+
+    if (message.compid == ILLUMINATOR_COMPONENT_ID && heartbeat.type == MAV_TYPE_ILLUMINATOR_CUSTOM) {
+        if (_illuminatorSystemId != message.sysid) {
+            _illuminatorSystemId = message.sysid;
+            emit illuminatorChanged();
+        }
+        _setIlluminatorAvailable(true);
+        if (!_illuminatorStatusKnown) {
+            requestIlluminatorStatus();
+        }
+        return;
+    }
+
+    if (message.compid != _defaultComponentId) {
+        return;
+    }
 
     bool newArmed = heartbeat.base_mode & MAV_MODE_FLAG_DECODE_POSITION_SAFETY;
 
@@ -1620,6 +1641,14 @@ void Vehicle::_handleHeartbeat(mavlink_message_t& message)
             emit flightModeChanged(flightMode());
         }
     }
+}
+
+bool Vehicle::_isIlluminatorMessage(const mavlink_message_t& message) const
+{
+    return message.compid == ILLUMINATOR_COMPONENT_ID &&
+            (message.msgid == MAVLINK_MSG_ID_HEARTBEAT ||
+             message.msgid == MAVLINK_MSG_ID_COMMAND_ACK ||
+             message.msgid == MAVLINK_MSG_ID_ILLUMINATOR_STATUS_CUSTOM);
 }
 
 void Vehicle::_handleCurrentMode(mavlink_message_t& message)
@@ -2707,6 +2736,99 @@ void Vehicle::sendCommand(int compId, int command, bool showError, double param1
                 static_cast<float>(param5),
                 static_cast<float>(param6),
                 static_cast<float>(param7));
+}
+
+bool Vehicle::sendIlluminatorOnOff(bool enabled)
+{
+    const float enableParam = enabled ? 1.0f : 0.0f;
+
+    SharedLinkInterfacePtr sharedLink = vehicleLinkManager()->primaryLink().lock();
+    if (!sharedLink) {
+        qCDebug(VehicleLog) << "sendIlluminatorOnOff: primary link gone!";
+        return false;
+    }
+
+    const uint8_t targetSystemId = static_cast<uint8_t>(_illuminatorSystemId >= 0 ? _illuminatorSystemId : _id);
+
+    mavlink_command_long_t commandLong = {};
+    commandLong.target_system = targetSystemId;
+    commandLong.target_component = ILLUMINATOR_COMPONENT_ID;
+    commandLong.command = MAV_CMD_ILLUMINATOR_ON_OFF_CUSTOM;
+    commandLong.param1 = enableParam;
+
+    mavlink_message_t msg;
+    mavlink_msg_command_long_encode_chan(MAVLinkProtocol::instance()->getSystemId(),
+                                         MAVLinkProtocol::getComponentId(),
+                                         sharedLink->mavlinkChannel(),
+                                         &msg,
+                                         &commandLong);
+    qCDebug(VehicleLog) << "sendIlluminatorOnOff"
+                        << "source" << MAVLinkProtocol::instance()->getSystemId() << MAVLinkProtocol::getComponentId()
+                        << "target" << commandLong.target_system << commandLong.target_component
+                        << "command" << commandLong.command
+                        << "param1" << commandLong.param1
+                        << "link" << sharedLink->linkConfiguration()->name();
+    return sendMessageOnLinkThreadSafe(sharedLink.get(), msg);
+}
+
+void Vehicle::requestIlluminatorStatus()
+{
+    SharedLinkInterfacePtr sharedLink = vehicleLinkManager()->primaryLink().lock();
+    if (!sharedLink) {
+        qCDebug(VehicleLog) << "requestIlluminatorStatus: primary link gone!";
+        return;
+    }
+
+    const uint8_t targetSystemId = static_cast<uint8_t>(_illuminatorSystemId >= 0 ? _illuminatorSystemId : _id);
+
+    mavlink_command_long_t commandLong = {};
+    commandLong.target_system = targetSystemId;
+    commandLong.target_component = ILLUMINATOR_COMPONENT_ID;
+    commandLong.command = MAV_CMD_REQUEST_MESSAGE;
+    commandLong.param1 = MAVLINK_MSG_ID_ILLUMINATOR_STATUS_CUSTOM;
+
+    mavlink_message_t msg;
+    mavlink_msg_command_long_encode_chan(MAVLinkProtocol::instance()->getSystemId(),
+                                         MAVLinkProtocol::getComponentId(),
+                                         sharedLink->mavlinkChannel(),
+                                         &msg,
+                                         &commandLong);
+    qCDebug(VehicleLog) << "requestIlluminatorStatus"
+                        << "source" << MAVLinkProtocol::instance()->getSystemId() << MAVLinkProtocol::getComponentId()
+                        << "target" << commandLong.target_system << commandLong.target_component
+                        << "command" << commandLong.command
+                        << "param1" << commandLong.param1
+                        << "link" << sharedLink->linkConfiguration()->name();
+    sendMessageOnLinkThreadSafe(sharedLink.get(), msg);
+}
+
+void Vehicle::_handleIlluminatorStatus(const mavlink_message_t& message)
+{
+    if (message.compid != ILLUMINATOR_COMPONENT_ID || message.len < kIlluminatorStatusEnablePayloadLength) {
+        return;
+    }
+
+    // This custom message is not available in QGC's generated MAVLink headers, so read the enable field by wire offset.
+    const uint8_t enable = _MAV_RETURN_uint8_t(&message, kIlluminatorStatusEnablePayloadOffset);
+    _setIlluminatorAvailable(true);
+    _setIlluminatorEnabled(enable != 0, true);
+}
+
+void Vehicle::_setIlluminatorAvailable(bool available)
+{
+    if (_illuminatorAvailable != available) {
+        _illuminatorAvailable = available;
+        emit illuminatorChanged();
+    }
+}
+
+void Vehicle::_setIlluminatorEnabled(bool enabled, bool statusKnown)
+{
+    if (_illuminatorEnabled != enabled || _illuminatorStatusKnown != statusKnown) {
+        _illuminatorEnabled = enabled;
+        _illuminatorStatusKnown = statusKnown;
+        emit illuminatorChanged();
+    }
 }
 
 void Vehicle::sendMavCommandWithHandler(const MavCmdAckHandlerInfo_t* ackHandlerInfo, int compId, MAV_CMD command, float param1, float param2, float param3, float param4, float param5, float param6, float param7)
