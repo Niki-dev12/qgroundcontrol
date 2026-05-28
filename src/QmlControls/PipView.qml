@@ -93,7 +93,10 @@ Item {
         id:         window
         visible:    false
         onClosing: {
-            var item = contentItem.children[0]
+            var item = _pipOrWindowItem
+            if (!item && contentItem.children.length > 0) {
+                item = contentItem.children[0]
+            }
             if (item) {
                 item.pipState.windowAboutToClose()
                 item.pipState.state = item.pipState.pipState
