@@ -1,7 +1,7 @@
 /****************************************************************************
  *
- *  SpatialUser4Instrument.qml
- *  Instrument-style widget for user3Lat/user3Lon/user3Data + selected tag row
+ *  TaggingData.qml
+ *  Instrument-style widget for selected tagging data.
  *
  ****************************************************************************/
 
@@ -15,37 +15,34 @@ Rectangle {
     id: root
 
     implicitWidth:  ScreenTools.defaultFontPixelHeight * 12
-    implicitHeight: ScreenTools.defaultFontPixelHeight * 6.2 
+    implicitHeight: ScreenTools.defaultFontPixelHeight * 6.2
     width:          implicitWidth
     height:         implicitHeight
 
     readonly property int windowColumns: 3
     readonly property int coordinatePrecision: 5
-    property bool debug: false
 
     property var vehicle: QGroundControl.multiVehicleManager.activeVehicle
 
-    // USER3 facts
     readonly property var user3LatFact:  vehicle ? vehicle.user3Lat  : null
     readonly property var user3LonFact:  vehicle ? vehicle.user3Lon  : null
     readonly property var user3DataFact: vehicle ? vehicle.user3Data : null
 
-    // List of all detected USER4 
     property var tagIdsModel: []
     property int selectedTagId: -1
-    property var comboDet: null
+    property var selectedTagDetection: null
 
-    function updateComboDet() {
-        comboDet = null
+    function updateSelectedTagDetection() {
+        selectedTagDetection = null
         if (!vehicle || selectedTagId < 0 || !vehicle.geopixelDetections) {
             return
         }
 
-        const list = vehicle.geopixelDetections
-        for (let i = 0; i < list.count; i++) {
-            const det = list.get(i)
-            if (det && det.objectId === selectedTagId) {
-                comboDet = det
+        const detections = vehicle.geopixelDetections
+        for (let detectionIndex = 0; detectionIndex < detections.count; detectionIndex++) {
+            const detection = detections.get(detectionIndex)
+            if (detection && detection.objectId === selectedTagId) {
+                selectedTagDetection = detection
                 return
             }
         }
@@ -55,15 +52,16 @@ Rectangle {
         target: root.vehicle
 
         function onSelectedGeopixelObjectIdChanged() {
-            if (!root.vehicle) return
+            if (!root.vehicle) {
+                return
+            }
 
             root.selectedTagId = root.vehicle.selectedGeopixelObjectId
-            root.updateComboDet()
+            root.updateSelectedTagDetection()
 
-            // also keep combo UI synced
-            const idx = root.tagIdsModel.indexOf(root.selectedTagId)
-            if (idx >= 0 && tagCombo.currentIndex !== idx) {
-                tagCombo.currentIndex = idx
+            const selectedTagIndex = root.tagIdsModel.indexOf(root.selectedTagId)
+            if (selectedTagIndex >= 0 && tagCombo.currentIndex !== selectedTagIndex) {
+                tagCombo.currentIndex = selectedTagIndex
             }
         }
     }
@@ -71,13 +69,13 @@ Rectangle {
     Component.onCompleted: {
         if (vehicle) {
             selectedTagId = vehicle.selectedGeopixelObjectId
-            updateComboDet()
+            updateSelectedTagDetection()
         }
     }
 
-    readonly property var comboCoord: (comboDet && comboDet.coordinate && comboDet.coordinate.isValid)
-                                    ? comboDet.coordinate
-                                    : null
+    readonly property var selectedTagCoordinate: (selectedTagDetection && selectedTagDetection.coordinate && selectedTagDetection.coordinate.isValid)
+                                                ? selectedTagDetection.coordinate
+                                                : null
 
     QGCPalette {
         id: palette
@@ -89,28 +87,28 @@ Rectangle {
     radius: ScreenTools.defaultFontPixelHeight * 0.5
 
     function formatNumber(value, digits) {
-        const d = Math.max(0, Math.min(10, Number(digits) || 0))
-        const n = Number(value)
-        return Number.isFinite(n) ? n.toFixed(d) : "--"
+        const boundedDigits = Math.max(0, Math.min(10, Number(digits) || 0))
+        const numericValue = Number(value)
+        return Number.isFinite(numericValue) ? numericValue.toFixed(boundedDigits) : "--"
     }
 
     function rebuildTagIdsModel() {
-        const v = vehicle
-        if (!v || !v.geopixelDetections) {
+        const activeVehicle = vehicle
+        if (!activeVehicle || !activeVehicle.geopixelDetections) {
             tagIdsModel = []
             return
         }
 
-        const arr = []
-        const list = v.geopixelDetections
-        for (let i = 0; i < list.count; i++) {
-            const det = list.get(i)
-            if (det && det.objectId !== undefined && det.objectId !== null) {
-                arr.push(det.objectId)
+        const tagIds = []
+        const detections = activeVehicle.geopixelDetections
+        for (let detectionIndex = 0; detectionIndex < detections.count; detectionIndex++) {
+            const detection = detections.get(detectionIndex)
+            if (detection && detection.objectId !== undefined && detection.objectId !== null) {
+                tagIds.push(detection.objectId)
             }
         }
 
-        tagIdsModel = Array.from(new Set(arr)).sort((a,b) => a-b)
+        tagIdsModel = Array.from(new Set(tagIds)).sort((leftTagId, rightTagId) => leftTagId - rightTagId)
     }
 
     onVehicleChanged: rebuildTagIdsModel()
@@ -180,21 +178,27 @@ Rectangle {
                     Connections {
                         target: root.vehicle
                         function onSelectedGeopixelObjectIdChanged() {
-                            if (!root.vehicle) return
-                            const idx = root.tagIdsModel.indexOf(root.vehicle.selectedGeopixelObjectId)
-                            if (idx >= 0 && tagCombo.currentIndex !== idx) {
-                                tagCombo.currentIndex = idx
+                            if (!root.vehicle) {
+                                return
+                            }
+
+                            const selectedTagIndex = root.tagIdsModel.indexOf(root.vehicle.selectedGeopixelObjectId)
+                            if (selectedTagIndex >= 0 && tagCombo.currentIndex !== selectedTagIndex) {
+                                tagCombo.currentIndex = selectedTagIndex
                             }
                         }
                     }
 
                     onActivated: {
-                        if (!root.vehicle) return
+                        if (!root.vehicle) {
+                            return
+                        }
+
                         if (currentIndex >= 0 && currentIndex < root.tagIdsModel.length) {
-                            const id = root.tagIdsModel[currentIndex]
-                            root.vehicle.selectedGeopixelObjectId = id
-                            root.selectedTagId = id
-                            root.updateComboDet()
+                            const selectedTagId = root.tagIdsModel[currentIndex]
+                            root.vehicle.selectedGeopixelObjectId = selectedTagId
+                            root.selectedTagId = selectedTagId
+                            root.updateSelectedTagDetection()
                         }
                     }
                 }
@@ -230,19 +234,19 @@ Rectangle {
                 width: content.cellWidth
                 horizontalAlignment: Text.AlignHCenter
                 verticalAlignment: Text.AlignVCenter
-                text: root.comboCoord ? root.formatNumber(root.comboCoord.latitude, root.coordinatePrecision) : "--"
+                text: root.selectedTagCoordinate ? root.formatNumber(root.selectedTagCoordinate.latitude, root.coordinatePrecision) : "--"
             }
             QGCLabel {
                 width: content.cellWidth
                 horizontalAlignment: Text.AlignHCenter
                 verticalAlignment: Text.AlignVCenter
-                text: root.comboCoord ? root.formatNumber(root.comboCoord.longitude, root.coordinatePrecision) : "--"
+                text: root.selectedTagCoordinate ? root.formatNumber(root.selectedTagCoordinate.longitude, root.coordinatePrecision) : "--"
             }
             QGCLabel {
                 width: content.cellWidth
                 horizontalAlignment: Text.AlignHCenter
                 verticalAlignment: Text.AlignVCenter
-                text: root.comboDet ? root.formatNumber(root.comboDet.altitude, 1) : "--"
+                text: root.selectedTagDetection ? root.formatNumber(root.selectedTagDetection.altitude, 1) : "--"
             }
         }
     }

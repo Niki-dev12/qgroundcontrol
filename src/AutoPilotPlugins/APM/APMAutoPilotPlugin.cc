@@ -118,11 +118,11 @@ const QVariantList &APMAutoPilotPlugin::vehicleComponents()
                 _components.append(QVariant::fromValue(qobject_cast<VehicleComponent*>(_cameraComponent)));
             }
 
-            if (_vehicle->sub()) {
-                _lightsComponent = new APMLightsComponent(_vehicle, this);
-                _lightsComponent->setupTriggerSignals();
-                _components.append(QVariant::fromValue(qobject_cast<VehicleComponent*>(_lightsComponent)));
+            _lightsComponent = new APMLightsComponent(_vehicle, this);
+            _lightsComponent->setupTriggerSignals();
+            _components.append(QVariant::fromValue(qobject_cast<VehicleComponent*>(_lightsComponent)));
 
+            if (_vehicle->sub()) {
                 if (_vehicle->versionCompare(3, 5, 0) >= 0) {
                     _subFrameComponent = new APMSubFrameComponent(_vehicle, this);
                     _subFrameComponent->setupTriggerSignals();

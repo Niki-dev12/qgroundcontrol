@@ -287,6 +287,24 @@ Item {
                         visible:            enableOnScreenControlCheckbox.checked && QGroundControl.settingsManager.gimbalControllerSettings.ControlType.rawValue === 1
                     }
 
+                    // --- Zoom speed group (added) ---
+                    SettingsGroupLayout {
+                        heading:        qsTr("Zoom speed")
+                        showDividers:   false
+                        Layout.columnSpan: 2
+                        visible:        enableOnScreenControlCheckbox.checked
+
+                        LabelledFactTextField {
+                            label:  qsTr("Max speed (min zoom)")
+                            fact:   QGroundControl.settingsManager.gimbalControllerSettings.zoomMaxSpeed
+                        }
+
+                        LabelledFactTextField {
+                            label:  qsTr("Min speed (max zoom)")
+                            fact:   QGroundControl.settingsManager.gimbalControllerSettings.zoomMinSpeed
+                        }
+                    }
+
                     // Separator
                     Rectangle {
                         Layout.columnSpan:       2

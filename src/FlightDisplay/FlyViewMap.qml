@@ -52,22 +52,32 @@ FlightMap {
     property bool   _keepVehicleCentered:       pipMode ? true : false
     property bool   _saveZoomLevelSetting:      true
 
-    // current selection
-    property int  selectedTagId: -1
-    property real selectedLat: NaN
-    property real selectedLon: NaN
+    property int selectedTagId: -1
 
-    signal tagClicked(int oid, real lat, real lon)
+    signal tagClicked(int objectId)
 
-    onTagClicked: (oid, lat, lon) => {
-        selectedTagId = oid
-        selectedLat   = lat
-        selectedLon   = lon
+    onTagClicked: (objectId) => {
+        selectedTagId = objectId
 
         if (_activeVehicle) {
             _activeVehicle.selectedGeopixelObjectId =
-                (_activeVehicle.selectedGeopixelObjectId === oid) ? -1 : oid
+                (_activeVehicle.selectedGeopixelObjectId === objectId) ? -1 : objectId
         }
+    }
+
+    // Choose valid visual parent for popups
+    function popupHostItem() {
+        if (typeof globals !== "undefined" &&
+            globals && globals.parent) {
+            return globals.parent
+        }
+        if (_root.window && _root.window.contentItem) {
+            return _root.window.contentItem
+        }
+        if (typeof mainWindow !== "undefined" && mainWindow) {
+            return mainWindow
+        }
+        return _root
     }
 
     function _adjustMapZoomForPipMode() {
@@ -245,40 +255,31 @@ FlightMap {
     QtObject {
         id: geoMarkerStyle
 
-        // One knob for USER 4
         readonly property real user4Scale: 0.9
 
-        // One knob for USER 3
         readonly property real user3Scale: 0.9
 
-        // USER3 derived sizes
         readonly property real user3MarkerSize: ScreenTools.defaultFontPixelHeight * 1.8 * user3Scale
         readonly property real user3Stroke:     ScreenTools.defaultFontPixelHeight * 0.22 * user3Scale
         readonly property real user3ArmScale:   1.4 * user3Scale
-        readonly property real user3LabelFontPx: ScreenTools.defaultFontPixelHeight * 0.55 * user3Scale
+        readonly property real user3LabelFontSize: ScreenTools.defaultFontPixelHeight * 0.55 * user3Scale
 
-        // Marker size
         readonly property real markerSize: ScreenTools.defaultFontPixelHeight * 1.8 * user4Scale
 
-        // X geometry
         readonly property real xArmLengthScale: 1.0 * user4Scale
         readonly property real xRotationPosDeg: 45
         readonly property real xRotationNegDeg: -45
         readonly property bool user4Rounded: false
 
-        // Stroke widths
         readonly property real user4Stroke:    ScreenTools.defaultFontPixelHeight * 0.20 * user4Scale
         readonly property real user4StrokeSel: ScreenTools.defaultFontPixelHeight * 0.22 * user4Scale
 
-        // Label font
-        readonly property real labelFontPx: ScreenTools.defaultFontPixelHeight * 0.55 * user4Scale
+        readonly property real labelFontSize: ScreenTools.defaultFontPixelHeight * 0.55 * user4Scale
 
-        // Label background circle
         readonly property real labelBgScale: 1.15 * user4Scale
         readonly property real labelBgOpacity: 1.0
         readonly property string unknownIdText: "?"
 
-        // Colors
         readonly property color markerNormal:   mapPal ? mapPal.text : qgcPal.text
         readonly property color markerSelected: qgcPal.warningText
         readonly property color labelText:      Qt.rgba(0,0,0,1)
@@ -341,11 +342,11 @@ FlightMap {
             map:        _root
             z:          QGroundControl.zOrderVehicles
             size: {
-                const ref   = 800.0
-                const k     = Math.min(_root.width, _root.height) / ref
-                const scale = Math.max(0.8, Math.min(2.0, k))
-                const base  = ScreenTools.defaultFontPixelHeight * 2
-                return base * scale
+                const referenceMapSide = 800.0
+                const currentMapScale = Math.min(_root.width, _root.height) / referenceMapSide
+                const boundedMapScale = Math.max(0.8, Math.min(2.0, currentMapScale))
+                const baseVehicleSize = ScreenTools.defaultFontPixelHeight * 2
+                return baseVehicleSize * boundedMapScale
             }
         }
     }
@@ -454,28 +455,22 @@ FlightMap {
             sourceItem: Item {
                 id: markerRoot3
 
-                readonly property int cls: object ? object.classId  : -1
-                readonly property int oid: object ? object.objectId : -1
-
-                // readonly property real markerSize: geoMarkerStyle.markerSize
+                readonly property int classId:  object ? object.classId  : -1
+                readonly property int objectId: object ? object.objectId : -1
                 readonly property real markerSize: geoMarkerStyle.user3MarkerSize
-
-                readonly property real labelScale: geoMarkerStyle.labelScale
 
                 width:  markerSize
                 height: markerSize
-
 
                 Item {
                     id: xMarker3
                     anchors.fill: parent
 
                     readonly property real strokeWidth: geoMarkerStyle.user3Stroke
-                    readonly property color lineColor:  geoMarkerStyle.markerSelected 
+                    readonly property color lineColor:  geoMarkerStyle.markerSelected
 
                     Rectangle {
                         width: parent.width * geoMarkerStyle.user3ArmScale
-                        // width: parent.width * geoMarkerStyle.xArmLengthScale
                         height: xMarker3.strokeWidth
                         color: xMarker3.lineColor
                         anchors.centerIn: parent
@@ -485,7 +480,6 @@ FlightMap {
 
                     Rectangle {
                         width: parent.width * geoMarkerStyle.user3ArmScale
-                        // width: parent.width * geoMarkerStyle.xArmLengthScale
                         height: xMarker3.strokeWidth
                         color: xMarker3.lineColor
                         anchors.centerIn: parent
@@ -496,11 +490,10 @@ FlightMap {
 
                 QGCLabel {
                     anchors.centerIn: parent
-                    text: markerRoot3.oid >= 0 ? String(markerRoot3.oid) : geoMarkerStyle.unknownIdText
+                    text: markerRoot3.objectId >= 0 ? String(markerRoot3.objectId) : geoMarkerStyle.unknownIdText
                     font.bold: true
-                    // font.pixelSize: parent.height * markerRoot3.labelScale
-                    font.pixelSize: geoMarkerStyle.user3LabelFontPx
-                    color: geoMarkerStyle.overlayText
+                    font.pixelSize: geoMarkerStyle.user3LabelFontSize
+                    color: geoMarkerStyle.labelText
                 }
 
                 MouseArea {
@@ -509,13 +502,11 @@ FlightMap {
                     cursorShape: Qt.PointingHandCursor
 
                     onClicked: {
-                        if (!detectionItem3._hasValidCoord || markerRoot3.oid < 0) return
+                        if (!detectionItem3._hasValidCoord || markerRoot3.objectId < 0) {
+                            return
+                        }
 
-                        _root.tagClicked(
-                            markerRoot3.oid,
-                            object.coordinate.latitude,
-                            object.coordinate.longitude
-                        )
+                        _root.tagClicked(markerRoot3.objectId)
                         _root.center = object.coordinate
                     }
                 }
@@ -528,16 +519,11 @@ FlightMap {
         id: taggedItemsView
         model: _activeVehicle ? _activeVehicle.geopixelDetections : null
 
-        // Local debug switch
-        property bool _debugGeoMarkers: false
-
         delegate: MapQuickItem {
             id: detectionItem
 
-            // Keep consistent with items layering.
             z: QGroundControl.zOrderMapItems
 
-            // Guard invalid data
             readonly property bool _hasValidCoord: object && object.coordinate && object.coordinate.isValid
             visible: _hasValidCoord
             coordinate: _hasValidCoord ? object.coordinate : QtPositioning.coordinate()
@@ -548,15 +534,13 @@ FlightMap {
             sourceItem: Item {
                 id: markerRoot
 
-                readonly property int cls: object ? object.classId  : -1
-                readonly property int oid: object ? object.objectId : -1
+                readonly property int classId:  object ? object.classId  : -1
+                readonly property int objectId: object ? object.objectId : -1
 
                 readonly property bool isSelected: _activeVehicle
-                                                 && _activeVehicle.selectedGeopixelObjectId === oid
+                                                 && _activeVehicle.selectedGeopixelObjectId === objectId
 
-                // Tunables
                 readonly property real markerSize: geoMarkerStyle.markerSize
-                readonly property real labelScale: geoMarkerStyle.labelScale
 
                 width:  markerSize
                 height: markerSize
@@ -600,11 +584,11 @@ FlightMap {
                     QGCLabel {
                         id: markerLabel
                         anchors.centerIn: parent
-                        text: markerRoot.oid >= 0
-                            ? String(markerRoot.oid)
+                        text: markerRoot.objectId >= 0
+                            ? String(markerRoot.objectId)
                             : geoMarkerStyle.unknownIdText
                         font.bold: false
-                        font.pixelSize: geoMarkerStyle.labelFontPx
+                        font.pixelSize: geoMarkerStyle.labelFontSize
                         color: geoMarkerStyle.labelText
                     }
 
@@ -627,16 +611,13 @@ FlightMap {
                     cursorShape: Qt.PointingHandCursor
 
                     onClicked: {
-                        const v = QGroundControl.multiVehicleManager.activeVehicle
-                        if (!v || !detectionItem._hasValidCoord || markerRoot.oid < 0) return
-                        v.selectedGeopixelObjectId = markerRoot.oid
-                        _root.center = object.coordinate
-                    }
-                }
+                        const activeVehicle = QGroundControl.multiVehicleManager.activeVehicle
+                        if (!activeVehicle || !detectionItem._hasValidCoord || markerRoot.objectId < 0) {
+                            return
+                        }
 
-                Component.onCompleted: {
-                    if (taggedItemsView._debugGeoMarkers) {
-                        console.log("[GeoMarker] created oid =", markerRoot.oid, "cls =", markerRoot.cls)
+                        activeVehicle.selectedGeopixelObjectId = markerRoot.objectId
+                        _root.center = object.coordinate
                     }
                 }
             }
@@ -853,11 +834,21 @@ FlightMap {
             anchors.fill: parent
             onClicked: (position) => {
                 position = Qt.point(position.x, position.y)
-                var clickCoord = _root.toCoordinate(position, false /* clipToViewPort */)
-                // For some strange reason using mainWindow in mapToItem doesn't work, so we use globals.parent instead which also gets us mainWindow
-                position = mapToItem(globals.parent, position)
-                var dropPanel = roiEditDropPanelComponent.createObject(mainWindow, { clickRect: Qt.rect(position.x, position.y, 0, 0) })
-                dropPanel.open()
+                var windowItem = (_root.window && _root.window.contentItem)
+                                 ? _root.window.contentItem
+                                 : _root
+
+                var hostPos = roiLocationItem.mapToItem(windowItem, position)
+
+                var dropPanel = roiEditDropPanelComponent.createObject(windowItem, {
+                    clickRect: Qt.rect(hostPos.x, hostPos.y, 0, 0)
+                })
+
+                if (!dropPanel) {
+                    console.log("[ROI] Failed to create roiEditDropPanel")
+                } else {
+                    dropPanel.open()
+                }
             }
         }
 
@@ -1031,17 +1022,29 @@ FlightMap {
     }
 
     onMapClicked: (position) => {
-        if (!globals.guidedControllerFlyView.guidedUIVisible && 
-            (globals.guidedControllerFlyView.showGotoLocation || globals.guidedControllerFlyView.showOrbit ||
-             globals.guidedControllerFlyView.showROI || globals.guidedControllerFlyView.showSetHome ||
+        if (!globals.guidedControllerFlyView.guidedUIVisible &&
+            (globals.guidedControllerFlyView.showGotoLocation ||
+             globals.guidedControllerFlyView.showOrbit ||
+             globals.guidedControllerFlyView.showROI ||
+             globals.guidedControllerFlyView.showSetHome ||
              globals.guidedControllerFlyView.showSetEstimatorOrigin)) {
 
             position = Qt.point(position.x, position.y)
             var clickCoord = _root.toCoordinate(position, false /* clipToViewPort */)
-            // For some strange reason using mainWindow in mapToItem doesn't work, so we use globals.parent instead which also gets us mainWindow
-            position = _root.mapToItem(globals.parent, position)
-            var dropPanel = mapClickDropPanelComponent.createObject(mainWindow, { mapClickCoord: clickCoord, clickRect: Qt.rect(position.x, position.y, 0, 0) })
-            dropPanel.open()
+            var windowItem = (_root.window && _root.window.contentItem)
+                             ? _root.window.contentItem
+                             : _root
+            var hostPos = _root.mapToItem(windowItem, position)
+            var dropPanel = mapClickDropPanelComponent.createObject(windowItem, {
+                mapClickCoord: clickCoord,
+                clickRect: Qt.rect(hostPos.x, hostPos.y, 0, 0)
+            })
+
+            if (!dropPanel) {
+                console.log("[FlyViewMap] Failed to create mapClickDropPanel")
+            } else {
+                dropPanel.open()
+            }
         }
     }
 

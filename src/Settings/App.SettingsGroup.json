@@ -254,6 +254,16 @@
     "shortDesc": "AirLink Password",
     "type": "string",
     "default": ""
+},
+{
+    "name":         "uiLayout",
+    "shortDesc":    "UI Layout",
+    "longDesc":     "Select which UI layout to use (Default, Stribog, or FPV).",
+    "type":         "uint32",
+    "enumStrings":  "Normal,Auto,FPV",
+    "enumValues":   "0,1,2",
+    "default":      0,
+    "qgcRebootRequired": false
 }
 ]
 }

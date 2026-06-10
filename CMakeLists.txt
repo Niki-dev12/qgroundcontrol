@@ -39,6 +39,40 @@ endif()
 
 include(Git)
 
+# -------------------------------------------------------
+# Custom Stribog version: av3_1_2-<short git hash>
+# -------------------------------------------------------
+set(STRIBOG_BASE_VERSION "av4_1_2")
+set(STRIBOG_COMMIT_SHORT "unknown")
+
+# Prefer QGC-provided hash if available
+if(DEFINED QGC_GIT_HASH AND NOT QGC_GIT_HASH STREQUAL "")
+    string(SUBSTRING "${QGC_GIT_HASH}" 0 7 STRIBOG_COMMIT_SHORT)
+else()
+    find_package(Git QUIET)
+    if(GIT_FOUND)
+        execute_process(
+            COMMAND "${GIT_EXECUTABLE}" rev-parse --short=7 HEAD
+            WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+            OUTPUT_VARIABLE STRIBOG_COMMIT_SHORT
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+            ERROR_QUIET
+        )
+        if(STRIBOG_COMMIT_SHORT STREQUAL "")
+            set(STRIBOG_COMMIT_SHORT "unknown")
+        endif()
+    endif()
+endif()
+
+if(DEFINED QGC_APP_VERSION_STR)
+    set(QGC_APP_VERSION_STR_ORIG "${QGC_APP_VERSION_STR}")
+else()
+    set(QGC_APP_VERSION_STR_ORIG "")
+endif()
+
+set(QGC_APP_VERSION_STR "${STRIBOG_BASE_VERSION}-${STRIBOG_COMMIT_SHORT}")
+message(STATUS "Stribog custom version: ${QGC_APP_VERSION_STR}")
+
 project(${QGC_APP_NAME}
     VERSION ${QGC_APP_VERSION}
     DESCRIPTION ${QGC_APP_DESCRIPTION}

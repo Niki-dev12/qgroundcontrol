@@ -30,6 +30,8 @@ SettingsPage {
     property Fact   _userBrandImageOutdoor:     _brandImageSettings.userBrandImageOutdoor
     property Fact   _appSavePath:               _appSettings.savePath
 
+    property Fact   _uiLayout:                 _appSettings.uiLayout  //dev
+
     SettingsGroupLayout {
         Layout.fillWidth:   true
         heading:            qsTr("General")
@@ -157,6 +159,14 @@ SettingsPage {
                 }
             }
         }
+        //FPV
+        LabelledFactComboBox {
+                label:      qsTr("UI Layout")
+                fact:       _uiLayout
+                indexModel: false
+                visible:    _uiLayout.visible
+            }
+        //FPV
     }
 
     SettingsGroupLayout {

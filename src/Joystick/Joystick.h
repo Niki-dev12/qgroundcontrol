@@ -183,6 +183,10 @@ public:
     /// Set joystick button repeat rate (in Hz)
     void setButtonFrequency(float val);
 
+    int gimbalMaxSpeed() const { return _gimbalMaxSpeed; }
+    static int deadbandFromPercent(float percent, int minVal, int maxVal);
+
+
 signals:
     // The raw signals are only meant for use by calibration
     void rawAxisValueChanged(int index, int value);
@@ -223,6 +227,16 @@ signals:
     void landingGearRetract();
     void motorInterlock(bool enable);
     void unknownAction(const QString &action);
+    //FPV
+    void setCancel                   (bool arm);
+    void toggleTrackEngage              (bool arm);
+    void toggleHudVisible               (bool visible);
+    void toggleTrackerType              (bool type);
+    void toggleAIStrike                 (bool ai);
+    void toggleSelectMode               (bool selectmode);
+    void setEngage                   (bool arm);
+    void setTrack                    (bool arm);
+    //FPV
 
 protected:
     void _setDefaultCalibration();
@@ -366,4 +380,15 @@ private:
     static constexpr const char *_buttonActionLandingGearRetract=  QT_TR_NOOP("Landing gear retract");
     static constexpr const char *_buttonActionMotorInterlockEnable=   QT_TR_NOOP("Motor Interlock enable");
     static constexpr const char *_buttonActionMotorInterlockDisable=  QT_TR_NOOP("Motor Interlock disable");
+    static constexpr const char *_buttonActionCancel =                      QT_TR_NOOP("FPV Cancel"); //FPV
+    static constexpr const char *_buttonActionTrack =                       QT_TR_NOOP("FPV Track"); //FPV
+    static constexpr const char *_buttonActionEngage =                      QT_TR_NOOP("FPV Engage"); //FPV
+    static constexpr const char *_buttonActionTrackEngage =                 QT_TR_NOOP("FPV Track / Engage"); //FPV
+    static constexpr const char *_buttonActionHUD =                         QT_TR_NOOP("FPV HUD"); //FPV
+    static constexpr const char *_buttonActionTrackerType =                 QT_TR_NOOP("FPV Tracker Type"); //FPV
+    static constexpr const char *_buttonActionAIStrike =                    QT_TR_NOOP("FPV AI Strike"); //FPV
+    static constexpr const char *_buttonActionSelectMode =                  QT_TR_NOOP("FPV Select mode"); //FPV
+
+    bool _gimbalAxisEnabled = true;
+    int _gimbalMaxSpeed = 0;
 };

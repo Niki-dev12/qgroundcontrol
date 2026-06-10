@@ -11,7 +11,6 @@ import QtQuick
 
 import QGroundControl
 import QGroundControl.Controls
-import QGroundControl.Controllers
 import QGroundControl.ScreenTools
 
 Item {
@@ -20,10 +19,20 @@ Item {
     property Item pipView
     property Item pipState: videoPipState
 
-    property var _activeVehicle: QGroundControl.multiVehicleManager.activeVehicle
+    //FPV
+    property var    _activeVehicle:             QGroundControl.multiVehicleManager.activeVehicle
+
+    property bool drawing: false
+    property real startX: 0
+    property real startY: 0
+    property real currentX: 0
+    property real currentY: 0
+    //FPV
 
     property int    _track_rec_x:       0
     property int    _track_rec_y:       0
+    property real telemetryBottomInset: 0
+    property bool videoMinimized: false
 
     PipState {
         id:         videoPipState
@@ -118,6 +127,12 @@ Item {
         onClicked:       onScreenGimbalController.clickControl()
         onDoubleClicked: QGroundControl.videoManager.fullScreen = !QGroundControl.videoManager.fullScreen
 
+        //FPV
+        property bool isDragging: false
+        property real dragThreshold: 5
+        property point pressPos: Qt.point(0, 0)
+        //FPV
+
         onPressed:(mouse) => {
             onScreenGimbalController.pressControl()
 
@@ -133,8 +148,26 @@ Item {
                     });
                 }
             }
+            //FPV
+            pressPos = Qt.point(mouse.x, mouse.y)
+            isDragging = false
+            drawing = true
+            startX = mouse.x
+            startY = mouse.y
+            currentX = startX
+            currentY = startY
+            //FPV
         }
         onPositionChanged: (mouse) => {
+            //FPV
+            const dx = mouse.x - pressPos.x
+            const dy = mouse.y - pressPos.y
+            if (Math.sqrt(dx * dx + dy * dy) > dragThreshold) {
+                isDragging = true
+                currentX = mouse.x
+                currentY = mouse.y
+            }
+            //FPV
             //on move, update the width of rectangle
             if (trackingROI !== null) {
                 if (mouse.x < trackingROI.x) {
@@ -153,18 +186,26 @@ Item {
         }
         onReleased: (mouse) => {
             onScreenGimbalController.releaseControl()
-            if (_activeVehicle) {
-                _activeVehicle.boundingBoxClick(
-                    mouse.x,
-                    mouse.y,
-                    videoStreaming.width,
-                    videoStreaming.height,
-                    0,
-                    0
-                )
-            }
 
-            
+            //FPV
+            drawing = false
+            if (isDragging) {
+                if (_activeVehicle) {
+                    const boxX = Math.min(startX, currentX)
+                    const boxY = Math.min(startY, currentY)
+                    const boxW = Math.abs(currentX - startX)
+                    const boxH = Math.abs(currentY - startY)
+                    const centerX = boxX + boxW / 2
+                    const centerY = boxY + boxH / 2
+                    _activeVehicle.boundingBoxClick(centerX, centerY, videoStreaming.width, videoStreaming.height, boxW, boxH)
+                }
+            } else {
+                if (_activeVehicle) {
+                    _activeVehicle.boundingBoxClick(mouse.x, mouse.y, videoStreaming.width, videoStreaming.height, 0, 0)
+                }
+            }
+            //FPV
+
             //if there is already a selection, delete it
             if (trackingROI !== null) {
                 trackingROI.destroy();
@@ -261,6 +302,19 @@ Item {
         }
     }
 
+    //FPV
+    Rectangle {
+        visible: drawing
+        color: "transparent"
+        border.color: "red"
+        border.width: 2
+        x: Math.min(startX, currentX)
+        y: Math.min(startY, currentY)
+        width: Math.abs(currentX - startX)
+        height: Math.abs(currentY - startY)
+    }
+    //FPV
+
     ProximityRadarVideoView{
         anchors.fill:   parent
         vehicle:        QGroundControl.multiVehicleManager.activeVehicle
@@ -270,4 +324,23 @@ Item {
         id: obstacleDistance
         showText: pipState.state === pipState.fullState
     }
+
+    CustomHudOverlay {
+        id: customHud
+        x: 0
+        y: 0
+        width:  _root.width
+        height: _root.height
+        z: 9999
+        visible: QGroundControl.videoManager.decoding && QGroundControl.videoManager.hudEnabled
+
+        bottomUiInset:  videoControl.telemetryBottomInset
+        videoMinimized: videoControl.videoMinimized
+
+        vehicle: QGroundControl.multiVehicleManager.activeVehicle
+        camera:  videoStreaming._camera
+        pipState: _root.pipState
+    }
+
+
 }

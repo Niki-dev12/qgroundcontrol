@@ -12,6 +12,7 @@
 #include <QtCore/QElapsedTimer>
 #include <QtCore/QObject>
 #include <QtCore/QSharedPointer>
+#include <QtCore/QSizeF>
 #include <QtCore/QTime>
 #include <QtCore/QTimer>
 #include <QtCore/QVariantList>
@@ -220,6 +221,10 @@ public:
     Q_PROPERTY(CheckList            checkListState              READ checkListState             WRITE setCheckListState             NOTIFY checkListStateChanged)
     Q_PROPERTY(bool                 readyToFlyAvailable         READ readyToFlyAvailable                                            NOTIFY readyToFlyAvailableChanged)  ///< true: readyToFly signalling is available on this vehicle
     Q_PROPERTY(bool                 readyToFly                  READ readyToFly                                                     NOTIFY readyToFlyChanged)
+    Q_PROPERTY(bool                 illuminatorAvailable        READ illuminatorAvailable                                           NOTIFY illuminatorChanged)
+    Q_PROPERTY(bool                 illuminatorEnabled          READ illuminatorEnabled                                             NOTIFY illuminatorChanged)
+    Q_PROPERTY(bool                 illuminatorStatusKnown      READ illuminatorStatusKnown                                         NOTIFY illuminatorChanged)
+    Q_PROPERTY(QString              illuminatorTarget           READ illuminatorTarget                                              NOTIFY illuminatorChanged)
     Q_PROPERTY(QObject*             sysStatusSensorInfo         READ sysStatusSensorInfo                                            CONSTANT)
     Q_PROPERTY(bool                 allSensorsHealthy           READ allSensorsHealthy                                              NOTIFY allSensorsHealthyChanged)    //< true: all sensors in SYS_STATUS reported as healthy
     Q_PROPERTY(bool                 requiresGpsFix              READ requiresGpsFix                                                 NOTIFY requiresGpsFixChanged)
@@ -287,8 +292,33 @@ public:
     Q_PROPERTY(QString  vehicleUIDStr               READ vehicleUIDStr              NOTIFY vehicleUIDChanged)
 
     Q_PROPERTY(bool     mavlinkSigning              READ mavlinkSigning             NOTIFY mavlinkSigningChanged)
-    Q_PROPERTY(int selectedGeopixelObjectId         READ selectedGeopixelObjectId   WRITE setSelectedGeopixelObjectId   NOTIFY selectedGeopixelObjectIdChanged) //dev
+    Q_PROPERTY(int      selectedGeopixelObjectId    READ selectedGeopixelObjectId   WRITE setSelectedGeopixelObjectId   NOTIFY selectedGeopixelObjectIdChanged)
 
+    //FPV
+    Q_PROPERTY(bool hudVisible READ hudVisible NOTIFY hudVisibleChanged)
+    Q_PROPERTY(bool aiStrike READ aiStrike NOTIFY aiStrikeChanged)
+    Q_PROPERTY(bool currentTrackerTypeValue READ currentTrackerTypeValue NOTIFY trackerTypeChanged)
+    Q_PROPERTY(bool currentSelectModeValue READ currentSelectModeValue NOTIFY selectModeChanged)
+
+    Q_PROPERTY(QString componentModelName READ componentModelName NOTIFY componentModelNameChanged)
+    Q_PROPERTY(CustomUILayout detectedCustomUILayout READ detectedCustomUILayout NOTIFY detectedCustomUILayoutChanged)
+    Q_PROPERTY(int detectedCustomUILayoutValue READ detectedCustomUILayoutValue NOTIFY detectedCustomUILayoutChanged)
+
+    public:
+    QString componentModelName() const { return _componentModelName; }
+
+    enum CustomUILayout {
+        CustomUILayoutNone = 0,
+        CustomUILayoutAVFPV
+    };
+    Q_ENUM(CustomUILayout)
+
+    CustomUILayout detectedCustomUILayout() const { return _detectedCustomUILayout; }
+    int detectedCustomUILayoutValue() const { return static_cast<int>(_detectedCustomUILayout); }
+
+    void setComponentModelName(const QString& modelName);
+
+    //FPV
     /// Resets link status counters
     Q_INVOKABLE void resetCounters  ();
 
@@ -385,6 +415,16 @@ public:
     ///     @param timeoutSec Disabled motor after this amount of time
     Q_INVOKABLE void motorTest(int motor, int percent, int timeoutSecs, bool showError);
 
+    //FPV
+    Q_INVOKABLE void onSidePanelButtonClicked(int command, int param1, bool isToggle, bool enabled);
+    Q_INVOKABLE void boundingBoxClick(float clickX, float clickY, float displayWidth, float displayHeight, float boxWidth, float boxHeight);
+    Q_INVOKABLE void toggleHudVisible(bool visible);
+
+    Q_INVOKABLE void toggleAIStrike();
+    Q_INVOKABLE void toggleTrackerType();
+    Q_INVOKABLE void toggleSelectMode();
+    //FPV
+
     enum PIDTuningTelemetryMode {
         ModeDisabled,
         ModeRateAndAttitude,
@@ -394,7 +434,7 @@ public:
     Q_ENUM(PIDTuningTelemetryMode)
 
     Q_INVOKABLE void setPIDTuningTelemetryMode(PIDTuningTelemetryMode mode);
-    
+
     Q_INVOKABLE void forceArm           ();
 
     /// Sends PARAM_MAP_RC message to vehicle
@@ -417,9 +457,7 @@ public:
 
     Q_INVOKABLE void sendSetupSigning();
 
-    Q_INVOKABLE void boundingBoxClick(float xClick, float yClick, float xDisplay, float yDisplay, float boxWidth, float boxHeight);
-
-    void getCurrentGstreamSize(float width, float height);
+    void setVideoStreamSize(const QSizeF &videoStreamSize);
 
     bool    isInitialConnectComplete() const;
     bool    guidedModeSupported     () const;
@@ -433,6 +471,30 @@ public:
     bool    hasGripper              () const;
     bool haveMRSpeedLimits() const { return _multirotor_speed_limits_available; }
     bool haveFWSpeedLimits() const { return _fixed_wing_airspeed_limits_available; }
+
+    //FPV
+    void setCurrentTrackEngage(int value);
+    void setCurrentTrackerType(int value);
+    int currentTrackEngageValue() const{ return _currentTrackEngageValue; }
+    int currentTrackerValue() const{ return _currentTrackerValue; }
+    void setCancel           (bool armed);
+    void toggleTrackEngage(bool armed);
+
+    void setCurrentHUD(int value);
+    int currentHUDValue() const{ return _currentHUDValue; }
+    int currentTrackerTypeValue() const{ return _currentTrackerTypeValue; }
+    void setCurrentAIStrike(int value);
+    int currentAIStrikeValue() const{ return _currentAIStrikeValue; }
+
+    bool hudVisible() const{ return _currentHUDValue; }
+    bool aiStrike() const{ return _currentAIStrikeValue; }
+
+    void setCurrentSelectMode(int value);
+    int currentSelectModeValue() const{ return _currentSelectModeValue; }
+
+    void setTrack(bool armed);
+    void setEngage(bool armed);
+    //FPV
 
     // Property accessors
 
@@ -580,6 +642,10 @@ public:
     QGCMapCircle*   orbitMapCircle              () { return &_orbitMapCircle; }
     bool            readyToFlyAvailable         () const{ return _readyToFlyAvailable; }
     bool            readyToFly                  () const{ return _readyToFly; }
+    bool            illuminatorAvailable        () const{ return _illuminatorAvailable; }
+    bool            illuminatorEnabled          () const{ return _illuminatorEnabled; }
+    bool            illuminatorStatusKnown      () const{ return _illuminatorStatusKnown; }
+    QString         illuminatorTarget           () const{ return QStringLiteral("sysid %1, compid %2").arg(_illuminatorSystemId >= 0 ? _illuminatorSystemId : _id).arg(36); }
     bool            allSensorsHealthy           () const{ return _allSensorsHealthy; }
     QObject*        sysStatusSensorInfo         () { return &_sysStatusSensorInfo; }
     bool            requiresGpsFix              () const { return static_cast<bool>(_onboardControlSensorsPresent & QGCMAVLink::SysStatusSensorGPS); }
@@ -661,6 +727,10 @@ public:
     /// Same as sendMavCommand but available from Qml.
     Q_INVOKABLE void sendCommand(int compId, int command, bool showError, double param1 = 0.0, double param2 = 0.0, double param3 = 0.0, double param4 = 0.0, double param5 = 0.0, double param6 = 0.0, double param7 = 0.0);
 
+    /// Send MAV_CMD_ILLUMINATOR_ON_OFF to the standard illuminator component.
+    Q_INVOKABLE bool sendIlluminatorOnOff(bool enabled);
+    Q_INVOKABLE void requestIlluminatorStatus();
+
     typedef enum {
         MavCmdResultCommandResultOnly,          ///< commandResult specifies full success/fail info
         MavCmdResultFailureNoResponseToCommand, ///< No response from vehicle to command
@@ -681,7 +751,7 @@ public:
     // Callback info for sendMavCommandWithHandler
     typedef struct MavCmdAckHandlerInfo_s {
         MavCmdResultHandler     resultHandler;          ///> nullptr for no handler
-        void*                   resultHandlerData; 
+        void*                   resultHandlerData;
         MavCmdProgressHandler   progressHandler;
         void*                   progressHandlerData;    ///> nullptr for no handler
     } MavCmdAckHandlerInfo_t;
@@ -689,7 +759,7 @@ public:
     /// Sends the command and calls the callback with the result
     void sendMavCommandWithHandler(
         const MavCmdAckHandlerInfo_t* ackHandlerInfo,   ///> nullptr to signale no handlers
-        int compId, MAV_CMD command, 
+        int compId, MAV_CMD command,
         float param1 = 0.0f, float param2 = 0.0f, float param3 = 0.0f, float param4 = 0.0f, float param5 = 0.0f, float param6 = 0.0f, float param7 = 0.0f);
 
     /// Sends the command and calls the callback with the result
@@ -697,7 +767,7 @@ public:
     ///     @param resultHandleData Opaque data passed through callback
     void sendMavCommandIntWithHandler(
         const MavCmdAckHandlerInfo_t* ackHandlerInfo,   ///> nullptr to signale no handlers
-        int compId, MAV_CMD command, MAV_FRAME frame, 
+        int compId, MAV_CMD command, MAV_FRAME frame,
         float param1 = 0.0f, float param2 = 0.0f, float param3 = 0.0f, float param4 = 0.0f, double param5 = 0.0f, double param6 = 0.0f, float param7 = 0.0f);
 
     /// Sends the command and calls the fallback lambda function in
@@ -825,10 +895,10 @@ public:
 
     GimbalController* gimbalController  () { return _gimbalController; }
 
-    int selectedGeopixelObjectId() const { return _selectedGeopixelObjectId; } //dev
-    void setSelectedGeopixelObjectId(int id); //dev
+    int selectedGeopixelObjectId() const { return _selectedGeopixelObjectId; }
+    void setSelectedGeopixelObjectId(int objectId);
 
-    Q_INVOKABLE QObject* geopixelDetectionById(int objectId) const; //dev
+    Q_INVOKABLE QObject* geopixelDetectionById(int objectId) const;
 
 public slots:
     void setVtolInFwdFlight                 (bool vtolInFwdFlight);
@@ -836,11 +906,11 @@ public slots:
     void _offlineVehicleTypeSettingChanged  (QVariant varVehicleType);  // Should only be used by MissionController to set vehicle type from Plan file
 
 signals:
-    void selectedGeopixelObjectIdChanged(); //dev
-    void user3DataChanged               (double lat, double lon, double special);
+    void selectedGeopixelObjectIdChanged();
     void coordinateChanged              (QGeoCoordinate coordinate);
     void joystickEnabledChanged         (bool enabled);
     void mavlinkMessageReceived         (const mavlink_message_t& message);
+    void illuminatorChanged             ();
     void homePositionChanged            (const QGeoCoordinate& homePosition);
     void armedPositionChanged();
     void armedChanged                   (bool armed);
@@ -888,7 +958,16 @@ signals:
     void requiresGpsFixChanged          ();
     void haveMRSpeedLimChanged          ();
     void haveFWSpeedLimChanged          ();
+    //FPV
+    void hudVisibleChanged(bool visible);
+    void aiStrikeChanged(bool visible);
+    void trackerTypeChanged(bool visible);
+    void selectModeChanged(bool visible);
 
+    void componentModelNameChanged();
+    void detectedCustomUILayoutChanged();
+    // void isAVFPVChanged();
+    //FPV
     void firmwareVersionChanged         ();
     void firmwareCustomVersionChanged   ();
     void gitHashChanged                 (QString hash);
@@ -963,13 +1042,15 @@ private slots:
     void _altitudeAboveTerrainReceived      (bool sucess, QList<double> heights);
 
 private:
-    int _selectedGeopixelObjectId{-1}; //dev
+    int _selectedGeopixelObjectId = -1;
     void _loadJoystickSettings          ();
     void _activeVehicleChanged          (Vehicle* newActiveVehicle);
     void _captureJoystick               ();
     void _handlePing                    (LinkInterface* link, mavlink_message_t& message);
     void _handleHomePosition            (mavlink_message_t& message);
     void _handleHeartbeat               (mavlink_message_t& message);
+    void _handleIlluminatorStatus       (const mavlink_message_t& message);
+    bool _isIlluminatorMessage          (const mavlink_message_t& message) const;
     void _handleCurrentMode             (mavlink_message_t& message);
     void _handleRadioStatus             (mavlink_message_t& message);
     void _handleRCChannels              (mavlink_message_t& message);
@@ -992,8 +1073,8 @@ private:
 #endif
     void _handleCameraImageCaptured     (const mavlink_message_t& message);
     void _handleCommandLong             (const mavlink_message_t& message);
-    void _handleSpatialUser4            (const mavlink_command_long_t& cmd);
-    void _handleSpatialUser3            (const mavlink_command_long_t& cmd); //dev
+    void _handleSpatialUser4            (const mavlink_command_long_t& commandLong);
+    void _handleSpatialUser3            (const mavlink_command_long_t& commandLong);
     QString _latLonToMgrs               (double latitudeDeg, double longitudeDeg, int meterPrecision);
     void _missionManagerError           (int errorCode, const QString& errorMsg);
     void _geoFenceManagerError          (int errorCode, const QString& errorMsg);
@@ -1021,6 +1102,22 @@ private:
     int     _id;                    ///< Mavlink system id
     int     _defaultComponentId;
     bool    _offlineEditingVehicle = false; ///< true: This Vehicle is a "disconnected" vehicle for ui use while offline editing
+
+    //FPV
+    int _modelId = -1;
+    int _currentTrackEngageValue;
+    int _currentTrackerValue;
+    int _hudOverrideValue = UINT16_MAX;
+
+    int _currentHUDValue;
+    int _currentTrackerTypeValue;
+    int _currentAIStrikeValue;
+    bool _hudVisible = false;
+    int _currentSelectModeValue;
+
+    QString _componentModelName;
+    CustomUILayout _detectedCustomUILayout = CustomUILayoutNone;
+    //FPV
 
     MAV_AUTOPILOT       _firmwareType;
     MAV_TYPE            _vehicleType;
@@ -1071,6 +1168,10 @@ private:
     CheckList       _checkListState                         = CheckListNotSetup;
     bool            _readyToFlyAvailable                    = false;
     bool            _readyToFly                             = false;
+    bool            _illuminatorAvailable                   = false;
+    bool            _illuminatorEnabled                     = false;
+    bool            _illuminatorStatusKnown                 = false;
+    int             _illuminatorSystemId                    = -1;
     bool            _allSensorsHealthy                      = true;
     bool            _mavlinkSigning                         = false;
 
@@ -1228,9 +1329,9 @@ private:
     static const int                _mavCommandAckTimeoutMSecsHighLatency   = 120000;
 
     void _sendMavCommandWorker  (
-            bool commandInt, bool showError, 
+            bool commandInt, bool showError,
             const MavCmdAckHandlerInfo_t* ackHandlerInfo,   ///> nullptr to signale no handlers
-            int compId, MAV_CMD command, MAV_FRAME frame, 
+            int compId, MAV_CMD command, MAV_FRAME frame,
             float param1, float param2, float param3, float param4, double param5, double param6, float param7);
     void _sendMavCommandFromList(int index);
     int  _findMavCommandListEntryIndex(int targetCompId, MAV_CMD command);
@@ -1312,17 +1413,15 @@ private:
     QGeoCoordinate              _altitudeAboveTerrLastCoord;
     float                       _altitudeAboveTerrLastRelAlt = qQNaN();
 
-    //dev
-    // Geopixel helper
-    static constexpr qint64 kGeoStaleMs = 10'000;
+    static constexpr qint64 _geopixelDetectionStaleTimeoutMSecs = 10 * 1000;
     QTimer _geopixelPruneTimer;
-    QHash<int, qint64> _user4LastSeenMs;
-    QHash<int, qint64> _user3LastSeenMs;
+    QHash<int, qint64> _user4LastSeenMSecs;
+    QHash<int, qint64> _user3LastSeenMSecs;
+    void _startGeopixelPruneTimer();
     void _pruneGeopixelDetections();
     void _pruneOneList(QmlObjectListModel& list,
-                   QHash<int, GeopixelDetection*>& byId,
-                   QHash<int, qint64>& lastSeenMs);
-    //dev
+                       QHash<int, GeopixelDetection*>& detectionById,
+                       QHash<int, qint64>& lastSeenMSecs);
 
 public:
     int32_t getMessageRate(uint8_t compId, uint16_t msgId);
@@ -1365,6 +1464,8 @@ private:
     void _handleControlStatus(const mavlink_message_t& message);
     void _handleCommandRequestOperatorControl(const mavlink_command_long_t commandLong);
     static void _requestOperatorControlAckHandler(void* resultHandlerData, int compId, const mavlink_command_ack_t& ack, MavCmdResultFailureCode_t failureCode);
+    void _setIlluminatorAvailable(bool available);
+    void _setIlluminatorEnabled(bool enabled, bool statusKnown);
 
     Q_PROPERTY(uint8_t sysidInControl                        READ sysidInControl                        NOTIFY gcsControlStatusChanged)
     Q_PROPERTY(bool    gcsControlStatusFlags_SystemManager   READ gcsControlStatusFlags_SystemManager   NOTIFY gcsControlStatusChanged)
@@ -1373,8 +1474,8 @@ private:
     Q_PROPERTY(int     operatorControlTakeoverTimeoutMsecs   READ operatorControlTakeoverTimeoutMsecs   CONSTANT)
     Q_PROPERTY(int     requestOperatorControlRemainingMsecs  READ requestOperatorControlRemainingMsecs  CONSTANT)
     Q_PROPERTY(bool    sendControlRequestAllowed             READ sendControlRequestAllowed             NOTIFY sendControlRequestAllowedChanged)
-    Q_PROPERTY(QmlObjectListModel* geopixelDetections READ geopixelDetections CONSTANT)
-    Q_PROPERTY(QmlObjectListModel* geopixelDetectionsUser3 READ geopixelDetectionsUser3 CONSTANT) //dev
+    Q_PROPERTY(QmlObjectListModel* geopixelDetections      READ geopixelDetections      CONSTANT)
+    Q_PROPERTY(QmlObjectListModel* geopixelDetectionsUser3 READ geopixelDetectionsUser3 CONSTANT)
 
     uint8_t sysidInControl() const { return _sysid_in_control; }
     bool    gcsControlStatusFlags_SystemManager() const { return _gcsControlStatusFlags_SystemManager; }
@@ -1384,7 +1485,7 @@ private:
     int     requestOperatorControlRemainingMsecs() const { return _timerRequestOperatorControl.remainingTime(); }
     bool    sendControlRequestAllowed() const { return _sendControlRequestAllowed; }
     void    requestOperatorControlStartTimer(int requestTimeoutMsecs);
-    
+
     uint8_t _sysid_in_control = 0;
     uint8_t _gcsControlStatusFlags = 0;
     bool    _gcsControlStatusFlags_SystemManager = 0;
@@ -1417,8 +1518,8 @@ public:
     Q_INVOKABLE void resetErrorLevelMessages();
     Q_INVOKABLE void clearMessages();
 
-    Q_INVOKABLE QObject* geopixelDetectionUser3ById(int objectId) const; //dev
-    
+    Q_INVOKABLE QObject* geopixelDetectionUser3ById(int objectId) const;
+
     bool messageTypeNone() const;
     bool messageTypeNormal() const;
     bool messageTypeWarning() const;
@@ -1429,7 +1530,7 @@ public:
     // StatusTextHandler* statusTextHandler() { return m_statusTextHandler; }
 
     QmlObjectListModel* geopixelDetections() { return &_geopixelDetections; }
-    QmlObjectListModel* geopixelDetectionsUser3()  { return &_geopixelDetectionsUser3; } //dev
+    QmlObjectListModel* geopixelDetectionsUser3()  { return &_geopixelDetectionsUser3; }
 
 signals:
     void textMessageReceived(int sysid, int componentid, int severity, QString text, QString description);
@@ -1487,12 +1588,11 @@ private:
 
     MAVLinkLogManager *_mavlinkLogManager = nullptr;
 
-    //dev
-    QmlObjectListModel          _geopixelDetections { this };
+    QSizeF _videoStreamSize;
+    QmlObjectListModel             _geopixelDetections { this };
     QHash<int, GeopixelDetection*> _geopixelDetectionsById;
     QmlObjectListModel             _geopixelDetectionsUser3 { this };
     QHash<int, GeopixelDetection*> _geopixelDetectionsUser3ById;
-    //dev
 /*---------------------------------------------------------------------------*/
 };
 Q_DECLARE_METATYPE(Vehicle::MavCmdResultFailureCode_t)

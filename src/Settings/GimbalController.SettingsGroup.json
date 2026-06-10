@@ -63,6 +63,27 @@
     "type":              "uint32",
     "default":           20,
     "units":             "deg/s"
+},
+{
+    "name":              "zoomMinSpeed",
+    "shortDesc":         "Maximum gimbal speed for min zoom (deg/sec)",
+    "type":              "uint32",
+    "default":           5,
+    "units":             "deg/s"
+},
+{
+    "name":              "zoomMaxSpeed",
+    "shortDesc":         "Minimum gimbal speed for max zoom (deg/sec)",
+    "type":              "uint32",
+    "default":           60,
+    "units":             "deg/s"
+},
+{
+    "name":              "gimbalSpeed",
+    "shortDesc":         "gimbal max speed",
+    "type":              "uint32",
+    "default":           80,
+    "units":             "deg"
 }
 ]
 }

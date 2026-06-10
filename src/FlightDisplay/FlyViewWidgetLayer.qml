@@ -54,6 +54,8 @@ Item {
 
     property bool utmspActTrigger
 
+    property alias bottomRightRowLayout: bottomRightRowLayout
+
     QGCToolInsets {
         id:                     _totalToolInsets
         leftEdgeTopInset:       toolStrip.leftEdgeTopInset

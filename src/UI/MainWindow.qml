@@ -22,6 +22,9 @@ import QGroundControl.FlightDisplay
 import QGroundControl.FlightMap
 
 import QGroundControl.UTMSP
+// import QGroundControl.FactSystem
+
+//FPV
 
 /// @brief Native QML top level window
 /// All properties defined here are visible to all QML pages.
@@ -32,10 +35,36 @@ ApplicationWindow {
     property bool   _utmspSendActTrigger
     property bool   _utmspStartTelemetry
 
+    //FPV
+    property real  _widthEdge:       40
+    property real  _betweenSpacing:  43
+    property string edgeColor:       "#222222"
+    property string minMAXBUTTON: "F11"
+
+    readonly property var _activeVehicle: QGroundControl.multiVehicleManager.activeVehicle
+    readonly property int _modelId: _activeVehicle ? _activeVehicle.modelId : -1
+
+    // True if currently fullscreen
+    property bool isFullScreen: visibility === Window.FullScreen
+
+    function toggleFullScreen() {
+        if (visibility === Window.FullScreen) {
+            visibility = Window.Windowed
+        } else {
+            visibility = Window.FullScreen
+        }
+    }
+
     Component.onCompleted: {
-        // Start the sequence of first run prompt(s)
         firstRunPromptManager.nextPrompt()
     }
+
+    Shortcut {
+        sequence: minMAXBUTTON
+        context: Qt.ApplicationShortcut
+        onActivated: mainWindow.toggleFullScreen()
+    }
+    //FPV
 
     /// Saves main window position and size and re-opens it in the same position and size next time
     MainWindowSavedState {
