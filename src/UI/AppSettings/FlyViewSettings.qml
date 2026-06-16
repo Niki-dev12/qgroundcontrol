@@ -24,6 +24,9 @@ import QGroundControl.Controllers
 
 SettingsPage {
     property var    _settingsManager:                       QGroundControl.settingsManager
+    property var    _appSettings:                           _settingsManager.appSettings
+    property Fact   _showCustomOptionalUi:                  _appSettings.showCustomOptionalUi
+
     property var    _flyViewSettings:                       _settingsManager.flyViewSettings
     property var    _mavlinkActionsSettings:                _settingsManager.mavlinkActionsSettings
     property Fact   _virtualJoystick:                       _settingsManager.appSettings.virtualJoystick
@@ -61,7 +64,7 @@ SettingsPage {
             text:               qsTr("Use Preflight Checklist")
             fact:               _useChecklist
             visible:            _useChecklist.visible && QGroundControl.corePlugin.options.preFlightChecklistUrl.toString().length
-            property Fact _useChecklist:      _settingsManager.appSettings.useChecklist
+            property Fact _useChecklist: _settingsManager.appSettings.useChecklist
         }
 
         FactCheckBoxSlider {
@@ -242,7 +245,7 @@ SettingsPage {
     SettingsGroupLayout {
         Layout.fillWidth:   true
         heading:            qsTr("3D View")
-        visible:            _viewer3DSettings.visible
+        visible:            _showCustomOptionalUi.rawValue && _viewer3DSettings.visible
 
         FactCheckBoxSlider {
             Layout.fillWidth:   true
@@ -251,13 +254,13 @@ SettingsPage {
             visible:            _viewer3DEnabled.visible
         }
 
-        ColumnLayout{
+        ColumnLayout {
             Layout.fillWidth:   true
             spacing:            ScreenTools.defaultFontPixelWidth
             enabled:            _viewer3DEnabled.rawValue
             visible:            _viewer3DOsmFilePath.rawValue
 
-            RowLayout{
+            RowLayout {
                 Layout.fillWidth:   true
                 spacing:            ScreenTools.defaultFontPixelWidth
 
@@ -279,7 +282,7 @@ SettingsPage {
                 }
             }
 
-            RowLayout{
+            RowLayout {
                 Layout.alignment:   Qt.AlignRight
                 spacing:            ScreenTools.defaultFontPixelWidth
 
@@ -298,9 +301,9 @@ SettingsPage {
                     onClicked: {
                         var filename = _viewer3DOsmFilePath.rawValue;
                         const found = filename.match(/(.*)[\/\\]/);
-                        if(found){
-                            filename = found[1]||''; // extracting the directory from the file path
-                            fileDialog.folder = (filename[0] === "/")?(filename.slice(1)):(filename);
+                        if (found) {
+                            filename = found[1] || "";
+                            fileDialog.folder = (filename[0] === "/") ? (filename.slice(1)) : (filename);
                         }
                         fileDialog.openForLoad()
                     }
@@ -311,8 +314,8 @@ SettingsPage {
                         title:          qsTr("Select map file")
 
                         onAcceptedForLoad: (file) => {
-                                               osmFileTextField.text = file
-                                               _viewer3DOsmFilePath.value = osmFileTextField.text
+                            osmFileTextField.text = file
+                            _viewer3DOsmFilePath.value = osmFileTextField.text
                         }
                     }
                 }

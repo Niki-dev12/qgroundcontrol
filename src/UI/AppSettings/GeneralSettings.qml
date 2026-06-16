@@ -7,7 +7,6 @@
  *
  ****************************************************************************/
 
-
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Dialogs
@@ -29,8 +28,8 @@ SettingsPage {
     property Fact   _userBrandImageIndoor:      _brandImageSettings.userBrandImageIndoor
     property Fact   _userBrandImageOutdoor:     _brandImageSettings.userBrandImageOutdoor
     property Fact   _appSavePath:               _appSettings.savePath
-
-    property Fact   _uiLayout:                 _appSettings.uiLayout  //dev
+    property Fact   _uiLayout:                  _appSettings.uiLayout
+    property Fact   _showCustomOptionalUi:      _appSettings.showCustomOptionalUi
 
     SettingsGroupLayout {
         Layout.fillWidth:   true
@@ -51,7 +50,7 @@ SettingsPage {
         }
 
         LabelledFactComboBox {
-            label:       qsTr("Stream GCS Position")
+            label:      qsTr("Stream GCS Position")
             fact:       _appSettings.followTarget
             indexModel: false
             visible:    _appSettings.followTarget.visible
@@ -59,9 +58,17 @@ SettingsPage {
 
         FactCheckBoxSlider {
             Layout.fillWidth: true
+            text:       qsTr("Show optional UI elements")
+            fact:       _showCustomOptionalUi
+            visible:    _showCustomOptionalUi.visible
+        }
+
+        FactCheckBoxSlider {
+            Layout.fillWidth: true
             text:           qsTr("Mute all audio output")
-            fact:       _audioMuted
-            visible:    _audioMuted.visible
+            fact:           _audioMuted
+            visible:        _showCustomOptionalUi.rawValue && _audioMuted.visible
+
             property Fact _audioMuted: _appSettings.audioMuted
         }
 
@@ -76,7 +83,9 @@ SettingsPage {
         QGCCheckBoxSlider {
             Layout.fillWidth: true
             text:       qsTr("Clear all settings on next start")
+            visible:    _showCustomOptionalUi.rawValue
             checked:    false
+
             onClicked: {
                 if (checked) {
                     QGroundControl.deleteAllSettingsNextBoot()
@@ -91,9 +100,9 @@ SettingsPage {
             spacing:            ScreenTools.defaultFontPixelWidth * 2
             visible:            _appFontPointSize.visible
 
-            QGCLabel { 
+            QGCLabel {
                 Layout.fillWidth:   true
-                text:               qsTr("UI Scaling") 
+                text:               qsTr("UI Scaling")
             }
 
             RowLayout {
@@ -132,14 +141,15 @@ SettingsPage {
         RowLayout {
             Layout.fillWidth:   true
             spacing:            ScreenTools.defaultFontPixelWidth * 2
-            visible:            _appSavePath.visible && !ScreenTools.isMobile
+            visible:            _showCustomOptionalUi.rawValue && _appSavePath.visible && !ScreenTools.isMobile
 
             ColumnLayout {
                 Layout.fillWidth:   true
                 spacing:            0
 
                 QGCLabel { text: qsTr("Application Load/Save Path") }
-                QGCLabel { 
+
+                QGCLabel {
                     Layout.fillWidth:   true
                     font.pointSize:     ScreenTools.smallFontPointSize
                     text:               _appSavePath.rawValue === "" ? qsTr("<default location>") : _appSavePath.value
@@ -150,6 +160,7 @@ SettingsPage {
             QGCButton {
                 text:       qsTr("Browse")
                 onClicked:  savePathBrowseDialog.openForLoad()
+
                 QGCFileDialog {
                     id:                 savePathBrowseDialog
                     title:              qsTr("Choose the location to save/load files")
@@ -159,14 +170,13 @@ SettingsPage {
                 }
             }
         }
-        //FPV
+
         LabelledFactComboBox {
-                label:      qsTr("UI Layout")
-                fact:       _uiLayout
-                indexModel: false
-                visible:    _uiLayout.visible
-            }
-        //FPV
+            label:      qsTr("UI Layout")
+            fact:       _uiLayout
+            indexModel: false
+            visible:    _uiLayout.visible
+        }
     }
 
     SettingsGroupLayout {
@@ -175,12 +185,16 @@ SettingsPage {
         visible:            QGroundControl.settingsManager.unitsSettings.visible
 
         Repeater {
-            model: [ QGroundControl.settingsManager.unitsSettings.horizontalDistanceUnits, QGroundControl.settingsManager.unitsSettings.verticalDistanceUnits, QGroundControl.settingsManager.unitsSettings.areaUnits, QGroundControl.settingsManager.unitsSettings.speedUnits, QGroundControl.settingsManager.unitsSettings.temperatureUnits ]
+            model: [ QGroundControl.settingsManager.unitsSettings.horizontalDistanceUnits,
+                     QGroundControl.settingsManager.unitsSettings.verticalDistanceUnits,
+                     QGroundControl.settingsManager.unitsSettings.areaUnits,
+                     QGroundControl.settingsManager.unitsSettings.speedUnits,
+                     QGroundControl.settingsManager.unitsSettings.temperatureUnits ]
 
             LabelledFactComboBox {
-                label:                  modelData.shortDescription
-                fact:                   modelData
-                indexModel:             false
+                label:      modelData.shortDescription
+                fact:       modelData
+                indexModel: false
             }
         }
     }
@@ -188,8 +202,8 @@ SettingsPage {
     SettingsGroupLayout {
         Layout.fillWidth:   true
         heading:            qsTr("Brand Image")
-        visible:            _brandImageSettings.visible && !ScreenTools.isMobile
-        
+        visible:            _showCustomOptionalUi.rawValue && _brandImageSettings.visible && !ScreenTools.isMobile
+
         RowLayout {
             Layout.fillWidth:   true
             spacing:            ScreenTools.defaultFontPixelWidth * 2
@@ -199,14 +213,15 @@ SettingsPage {
                 Layout.fillWidth:   true
                 spacing:            0
 
-                QGCLabel { 
+                QGCLabel {
                     Layout.fillWidth:   true
-                    text:               qsTr("Indoor Image") 
+                    text:               qsTr("Indoor Image")
                 }
-                QGCLabel { 
+
+                QGCLabel {
                     Layout.fillWidth:   true
                     font.pointSize:     ScreenTools.smallFontPointSize
-                    text:               _userBrandImageIndoor.valueString.replace("file:///", "") 
+                    text:               _userBrandImageIndoor.valueString.replace("file:///", "")
                     elide:              Text.ElideMiddle
                     visible:            _userBrandImageIndoor.valueString.length > 0
                 }
@@ -215,6 +230,7 @@ SettingsPage {
             QGCButton {
                 text:       qsTr("Browse")
                 onClicked:  userBrandImageIndoorBrowseDialog.openForLoad()
+                visible:    _userBrandImageIndoor.visible
 
                 QGCFileDialog {
                     id:                 userBrandImageIndoorBrowseDialog
@@ -235,14 +251,15 @@ SettingsPage {
                 Layout.fillWidth:   true
                 spacing:            0
 
-                QGCLabel { 
+                QGCLabel {
                     Layout.fillWidth:   true
-                    text:               qsTr("Outdoor Image") 
+                    text:               qsTr("Outdoor Image")
                 }
-                QGCLabel { 
+
+                QGCLabel {
                     Layout.fillWidth:   true
                     font.pointSize:     ScreenTools.smallFontPointSize
-                    text:               _userBrandImageOutdoor.valueString.replace("file:///", "") 
+                    text:               _userBrandImageOutdoor.valueString.replace("file:///", "")
                     elide:              Text.ElideMiddle
                     visible:            _userBrandImageOutdoor.valueString.length > 0
                 }
@@ -251,6 +268,7 @@ SettingsPage {
             QGCButton {
                 text:       qsTr("Browse")
                 onClicked:  userBrandImageOutdoorBrowseDialog.openForLoad()
+                visible:    _userBrandImageOutdoor.visible
 
                 QGCFileDialog {
                     id:                 userBrandImageOutdoorBrowseDialog
@@ -263,6 +281,7 @@ SettingsPage {
         }
 
         LabelledButton {
+            visible:    _showCustomOptionalUi.rawValue
             label:      qsTr("Reset Images")
             buttonText: qsTr("Reset")
             onClicked:  {

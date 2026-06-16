@@ -170,6 +170,7 @@ DECLARE_SETTINGSFACT(AppSettings, firstRunPromptIdsShown)
 DECLARE_SETTINGSFACT(AppSettings, loginAirLink)
 DECLARE_SETTINGSFACT(AppSettings, passAirLink)
 DECLARE_SETTINGSFACT(AppSettings, uiLayout)
+DECLARE_SETTINGSFACT(AppSettings, showCustomOptionalUi)
 
 DECLARE_SETTINGSFACT_NO_FUNC(AppSettings, indoorPalette)
 {

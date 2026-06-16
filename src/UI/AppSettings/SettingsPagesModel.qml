@@ -10,9 +10,14 @@
 import QtQml.Models
 
 import QGroundControl
+import QGroundControl.FactSystem
 import QGroundControl.ScreenTools
 
 ListModel {
+    property var    _settingsManager:           QGroundControl.settingsManager
+    property var    _appSettings:               _settingsManager.appSettings
+    property Fact   _showCustomOptionalUi:      _appSettings.showCustomOptionalUi
+
     ListElement {
         name: qsTr("General")
         url: "qrc:/qml/QGroundControl/AppSettings/GeneralSettings.qml"
@@ -38,28 +43,30 @@ ListModel {
         name: qsTr("Video")
         url: "qrc:/qml/QGroundControl/AppSettings/VideoSettings.qml"
         iconUrl: "qrc:/InstrumentValueIcons/camera.svg"
-        pageVisible: function() { return QGroundControl.settingsManager.videoSettings.visible }
+        pageVisible: function() {
+            return _showCustomOptionalUi.rawValue && QGroundControl.settingsManager.videoSettings.visible
+        }
     }
 
     ListElement {
         name: qsTr("Telemetry")
         url: "qrc:/qml/QGroundControl/AppSettings/TelemetrySettings.qml"
         iconUrl: "qrc:/InstrumentValueIcons/drone.svg"
-        pageVisible: function() { return true }
+        pageVisible: function() { return _showCustomOptionalUi.rawValue }
     }
 
     ListElement {
         name: qsTr("ADSB Server")
         url: "qrc:/qml/QGroundControl/AppSettings/ADSBServerSettings.qml"
         iconUrl: "qrc:/InstrumentValueIcons/airplane.svg"
-        pageVisible: function() { return true }
+        pageVisible: function() { return _showCustomOptionalUi.rawValue }
     }
 
     ListElement {
         name: qsTr("Comm Links")
         url: "qrc:/qml/QGroundControl/AppSettings/LinkSettings.qml"
         iconUrl: "qrc:/InstrumentValueIcons/usb.svg"
-        pageVisible: function() { return true }
+        pageVisible: function() { return _showCustomOptionalUi.rawValue }
     }
 
     ListElement {
@@ -73,11 +80,11 @@ ListModel {
         name: qsTr("PX4 Log Transfer")
         url: "qrc:/qml/QGroundControl/AppSettings/PX4LogTransferSettings.qml"
         iconUrl: "qrc:/InstrumentValueIcons/inbox-download.svg"
-        pageVisible: function() { 
+        pageVisible: function() {
             var activeVehicle = QGroundControl.multiVehicleManager.activeVehicle
-            return QGroundControl.corePlugin.options.showPX4LogTransferOptions && 
-                        QGroundControl.px4ProFirmwareSupported && 
-                        (activeVehicle ? activeVehicle.px4Firmware : true)
+            return QGroundControl.corePlugin.options.showPX4LogTransferOptions &&
+                   QGroundControl.px4ProFirmwareSupported &&
+                   (activeVehicle ? activeVehicle.px4Firmware : true)
         }
     }
 
@@ -92,14 +99,14 @@ ListModel {
         name: qsTr("Console")
         url: "qrc:/qml/QGroundControl/Controls/AppMessages.qml"
         iconUrl: "qrc:/InstrumentValueIcons/conversation.svg"
-        pageVisible: function() { return true }
+        pageVisible: function() { return _showCustomOptionalUi.rawValue }
     }
 
     ListElement {
         name: qsTr("Help")
         url: "qrc:/qml/QGroundControl/AppSettings/HelpSettings.qml"
         iconUrl: "qrc:/InstrumentValueIcons/question.svg"
-        pageVisible: function() { return true }
+        pageVisible: function() { return _showCustomOptionalUi.rawValue }
     }
 
     ListElement {
@@ -123,4 +130,3 @@ ListModel {
         pageVisible: function() { return ScreenTools.isDebug }
     }
 }
-
