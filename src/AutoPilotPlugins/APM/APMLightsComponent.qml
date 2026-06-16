@@ -75,7 +75,13 @@ SetupPage {
                     calcLightOutValues()
                     calcCurrentStep()
                 }
-                _activeVehicle.requestIlluminatorStatus()
+                refreshIlluminatorStatus()
+            }
+
+            function refreshIlluminatorStatus() {
+                if (_activeVehicle) {
+                    _activeVehicle.requestIlluminatorStatus()
+                }
             }
 
             function setIlluminatorEnabled(enabled) {
@@ -83,9 +89,19 @@ SetupPage {
                 // If rapid repeated clicks cause stale state, add a bounded ACK/status timeout here.
                 if (_activeVehicle.sendIlluminatorOnOff(enabled)) {
                     _illuminatorCommandStatusText = enabled ? qsTr("Lights on command sent") : qsTr("Lights off command sent")
-                    _activeVehicle.requestIlluminatorStatus()
+                    refreshIlluminatorStatus()
                 } else {
                     _illuminatorCommandStatusText = qsTr("Unable to send illuminator command")
+                }
+            }
+
+            Connections {
+                target: lightsPage
+
+                function onVisibleChanged() {
+                    if (lightsPage.visible) {
+                        refreshIlluminatorStatus()
+                    }
                 }
             }
 
@@ -185,7 +201,7 @@ SetupPage {
                     }
 
                     if (ackResult === _mavResultAccepted) {
-                        _activeVehicle.requestIlluminatorStatus()
+                        refreshIlluminatorStatus()
                     } else {
                         _illuminatorCommandStatusText = qsTr("Illuminator command rejected")
                     }
@@ -233,7 +249,7 @@ SetupPage {
 
                         QGCButton {
                             text:       qsTr("Refresh")
-                            onClicked:  _activeVehicle.requestIlluminatorStatus()
+                            onClicked:  refreshIlluminatorStatus()
                         }
                     }
 

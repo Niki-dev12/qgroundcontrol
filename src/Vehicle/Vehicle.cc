@@ -91,7 +91,6 @@ QGC_LOGGING_CATEGORY(VehicleLog, "VehicleLog")
 #define MAV_CMD_ILLUMINATOR_ON_OFF_CUSTOM 405
 #define MAVLINK_MSG_ID_ILLUMINATOR_STATUS_CUSTOM 440
 static constexpr uint8_t kIlluminatorStatusEnablePayloadOffset = 32;
-static constexpr uint8_t kIlluminatorStatusEnablePayloadLength = kIlluminatorStatusEnablePayloadOffset + sizeof(uint8_t);
 float gstreamWidth;
 float gstreamHeight;
 //FPV
@@ -2804,12 +2803,22 @@ void Vehicle::requestIlluminatorStatus()
 
 void Vehicle::_handleIlluminatorStatus(const mavlink_message_t& message)
 {
-    if (message.compid != ILLUMINATOR_COMPONENT_ID || message.len < kIlluminatorStatusEnablePayloadLength) {
+    if (message.compid != ILLUMINATOR_COMPONENT_ID) {
         return;
     }
 
-    // This custom message is not available in QGC's generated MAVLink headers, so read the enable field by wire offset.
-    const uint8_t enable = _MAV_RETURN_uint8_t(&message, kIlluminatorStatusEnablePayloadOffset);
+    // MAVLink 2 truncates trailing zero bytes. For ILLUMINATOR_STATUS, enable is at offset 32:
+    // enable=1 keeps byte 32 in the payload, while enable=0 may be truncated away.
+    const uint8_t enable = message.len > kIlluminatorStatusEnablePayloadOffset ?
+            _MAV_RETURN_uint8_t(&message, kIlluminatorStatusEnablePayloadOffset) : 0;
+    if (enable > 1) {
+        return;
+    }
+
+    if (_illuminatorSystemId != message.sysid) {
+        _illuminatorSystemId = message.sysid;
+        emit illuminatorChanged();
+    }
     _setIlluminatorAvailable(true);
     _setIlluminatorEnabled(enable != 0, true);
 }
