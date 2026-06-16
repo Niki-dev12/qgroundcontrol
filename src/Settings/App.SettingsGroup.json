@@ -264,6 +264,12 @@
     "enumValues":   "0,1,2",
     "default":      0,
     "qgcRebootRequired": false
+},
+{
+    "name": "showCustomOptionalUi",
+    "shortDescription": "Show custom optional UI",
+    "type": "bool",
+    "default": true
 }
 ]
 }
