@@ -58,11 +58,7 @@ Rectangle {
 
             root.selectedTagId = root.vehicle.selectedGeopixelObjectId
             root.updateSelectedTagDetection()
-
-            const selectedTagIndex = root.tagIdsModel.indexOf(root.selectedTagId)
-            if (selectedTagIndex >= 0 && tagCombo.currentIndex !== selectedTagIndex) {
-                tagCombo.currentIndex = selectedTagIndex
-            }
+            root.syncSelectedTagIndex()
         }
     }
 
@@ -92,10 +88,34 @@ Rectangle {
         return Number.isFinite(numericValue) ? numericValue.toFixed(boundedDigits) : "--"
     }
 
+    function tagIdsModelsEqual(leftTagIds, rightTagIds) {
+        if (leftTagIds.length !== rightTagIds.length) {
+            return false
+        }
+
+        for (let tagIndex = 0; tagIndex < leftTagIds.length; tagIndex++) {
+            if (leftTagIds[tagIndex] !== rightTagIds[tagIndex]) {
+                return false
+            }
+        }
+
+        return true
+    }
+
+    function syncSelectedTagIndex() {
+        const selectedTagIndex = tagIdsModel.indexOf(selectedTagId)
+        if (tagCombo.currentIndex !== selectedTagIndex) {
+            tagCombo.currentIndex = selectedTagIndex
+        }
+    }
+
     function rebuildTagIdsModel() {
         const activeVehicle = vehicle
         if (!activeVehicle || !activeVehicle.geopixelDetections) {
-            tagIdsModel = []
+            if (tagIdsModel.length > 0) {
+                tagIdsModel = []
+                syncSelectedTagIndex()
+            }
             return
         }
 
@@ -108,7 +128,11 @@ Rectangle {
             }
         }
 
-        tagIdsModel = Array.from(new Set(tagIds)).sort((leftTagId, rightTagId) => leftTagId - rightTagId)
+        const nextTagIdsModel = Array.from(new Set(tagIds)).sort((leftTagId, rightTagId) => leftTagId - rightTagId)
+        if (!tagIdsModelsEqual(tagIdsModel, nextTagIdsModel)) {
+            tagIdsModel = nextTagIdsModel
+            syncSelectedTagIndex()
+        }
     }
 
     onVehicleChanged: rebuildTagIdsModel()
@@ -174,20 +198,6 @@ Rectangle {
 
                     model: root.tagIdsModel
                     enabled: root.tagIdsModel.length > 0
-
-                    Connections {
-                        target: root.vehicle
-                        function onSelectedGeopixelObjectIdChanged() {
-                            if (!root.vehicle) {
-                                return
-                            }
-
-                            const selectedTagIndex = root.tagIdsModel.indexOf(root.vehicle.selectedGeopixelObjectId)
-                            if (selectedTagIndex >= 0 && tagCombo.currentIndex !== selectedTagIndex) {
-                                tagCombo.currentIndex = selectedTagIndex
-                            }
-                        }
-                    }
 
                     onActivated: {
                         if (!root.vehicle) {

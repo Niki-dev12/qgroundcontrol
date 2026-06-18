@@ -64,7 +64,6 @@
 #include "MavlinkCameraControl.h"
 
 #include <cstdint>
-#include <cstring>
 #include <algorithm>
 #include <cmath>
 
@@ -1469,12 +1468,25 @@ static uint8_t currentCameraStreamIndex(Vehicle* vehicle)
     return static_cast<uint8_t>(std::clamp(streamIndex, 0, 255));
 }
 
-static float uint32BitsToFloat(uint32_t rawValue)
+static float uint32ToMavlinkFloatParam(uint32_t rawValue)
 {
-    float floatValue = 0.f;
-    static_assert(sizeof(float) == sizeof(uint32_t), "float must be 32-bit");
-    std::memcpy(&floatValue, &rawValue, sizeof(rawValue));
-    return floatValue;
+    mavlink_param_union_t paramValue{};
+    paramValue.param_uint32 = rawValue;
+    return paramValue.param_float;
+}
+
+static uint32_t mavlinkFloatParamToUint32(float param)
+{
+    mavlink_param_union_t paramValue{};
+    paramValue.param_float = param;
+    return paramValue.param_uint32;
+}
+
+static int32_t mavlinkFloatParamToInt32(float param)
+{
+    mavlink_param_union_t paramValue{};
+    paramValue.param_float = param;
+    return paramValue.param_int32;
 }
 
 static uint32_t packNormalizedTagClickCoordinate(float normalizedX, float normalizedY)
@@ -1547,11 +1559,11 @@ void Vehicle::boundingBoxClick(float clickX, float clickY, float displayWidth, f
         tagClickGeopixelComponentId,
         MAV_CMD_SPATIAL_USER_2,
         false,
-        uint32BitsToFloat(packedClickCoordinate),
-        uint32BitsToFloat(packedTagMetadata),
+        uint32ToMavlinkFloatParam(packedClickCoordinate),
+        uint32ToMavlinkFloatParam(packedTagMetadata),
         0.0f,
         0.0f,
-        uint32BitsToFloat(packedRecipients),
+        uint32ToMavlinkFloatParam(packedRecipients),
         0.0f,
         0.0f);
 }
@@ -4650,39 +4662,13 @@ QObject* Vehicle::geopixelDetectionUser3ById(int objectId) const
 
 void Vehicle::_handleSpatialUser3(const mavlink_command_long_t& commandLong)
 {
-    const float latitudeBitsParam = commandLong.param1;
-    const float longitudeBitsParam = commandLong.param2;
-    const float altitudeBitsParam = commandLong.param3;
-    const float classIdBitsParam = commandLong.param4;
-    const float objectIdBitsParam = commandLong.param5;
-    const float timestampLowBitsParam = commandLong.param6;
-    const float timestampHighBitsParam = commandLong.param7;
-
-    static_assert(sizeof(float) == sizeof(quint32), "float must be 32 bits");
-
-    quint32 latitudeRawBits = 0;
-    quint32 longitudeRawBits = 0;
-    quint32 altitudeRawBits = 0;
-    quint32 classIdRawBits = 0;
-    quint32 objectIdRawBits = 0;
-    quint32 timestampLowRawBits = 0;
-    quint32 timestampHighRawBits = 0;
-
-    std::memcpy(&latitudeRawBits,      &latitudeBitsParam,      sizeof(latitudeRawBits));
-    std::memcpy(&longitudeRawBits,     &longitudeBitsParam,     sizeof(longitudeRawBits));
-    std::memcpy(&altitudeRawBits,      &altitudeBitsParam,      sizeof(altitudeRawBits));
-    std::memcpy(&classIdRawBits,       &classIdBitsParam,       sizeof(classIdRawBits));
-    std::memcpy(&objectIdRawBits,      &objectIdBitsParam,      sizeof(objectIdRawBits));
-    std::memcpy(&timestampLowRawBits,  &timestampLowBitsParam,  sizeof(timestampLowRawBits));
-    std::memcpy(&timestampHighRawBits, &timestampHighBitsParam, sizeof(timestampHighRawBits));
-
-    qint32 latE7 = 0;
-    qint32 lonE7 = 0;
-    std::memcpy(&latE7, &latitudeRawBits, sizeof(latE7));
-    std::memcpy(&lonE7, &longitudeRawBits, sizeof(lonE7));
-
-    float alt = 0.f;
-    std::memcpy(&alt, &altitudeRawBits, sizeof(alt));
+    const qint32 latE7 = mavlinkFloatParamToInt32(commandLong.param1);
+    const qint32 lonE7 = mavlinkFloatParamToInt32(commandLong.param2);
+    const float alt = commandLong.param3;
+    const quint32 classIdRawBits = mavlinkFloatParamToUint32(commandLong.param4);
+    const quint32 objectIdRawBits = mavlinkFloatParamToUint32(commandLong.param5);
+    const quint32 timestampLowRawBits = mavlinkFloatParamToUint32(commandLong.param6);
+    const quint32 timestampHighRawBits = mavlinkFloatParamToUint32(commandLong.param7);
 
     const double lat = static_cast<double>(latE7) / 1e7;
     const double lon = static_cast<double>(lonE7) / 1e7;
@@ -4719,39 +4705,13 @@ void Vehicle::_handleSpatialUser3(const mavlink_command_long_t& commandLong)
 
 void Vehicle::_handleSpatialUser4(const mavlink_command_long_t& commandLong)
 {
-    const float latitudeBitsParam = commandLong.param1;
-    const float longitudeBitsParam = commandLong.param2;
-    const float altitudeBitsParam = commandLong.param3;
-    const float classIdBitsParam = commandLong.param4;
-    const float objectIdBitsParam = commandLong.param5;
-    const float timestampLowBitsParam = commandLong.param6;
-    const float timestampHighBitsParam = commandLong.param7;
-
-    static_assert(sizeof(float) == sizeof(quint32), "float must be 32 bits");
-
-    quint32 latitudeRawBits = 0;
-    quint32 longitudeRawBits = 0;
-    quint32 altitudeRawBits = 0;
-    quint32 classIdRawBits = 0;
-    quint32 objectIdRawBits = 0;
-    quint32 timestampLowRawBits = 0;
-    quint32 timestampHighRawBits = 0;
-
-    std::memcpy(&latitudeRawBits,      &latitudeBitsParam,      sizeof(latitudeRawBits));
-    std::memcpy(&longitudeRawBits,     &longitudeBitsParam,     sizeof(longitudeRawBits));
-    std::memcpy(&altitudeRawBits,      &altitudeBitsParam,      sizeof(altitudeRawBits));
-    std::memcpy(&classIdRawBits,       &classIdBitsParam,       sizeof(classIdRawBits));
-    std::memcpy(&objectIdRawBits,      &objectIdBitsParam,      sizeof(objectIdRawBits));
-    std::memcpy(&timestampLowRawBits,  &timestampLowBitsParam,  sizeof(timestampLowRawBits));
-    std::memcpy(&timestampHighRawBits, &timestampHighBitsParam, sizeof(timestampHighRawBits));
-
-    qint32 latE7 = 0;
-    qint32 lonE7 = 0;
-    std::memcpy(&latE7, &latitudeRawBits, sizeof(latE7));
-    std::memcpy(&lonE7, &longitudeRawBits, sizeof(lonE7));
-
-    float alt = 0.f;
-    std::memcpy(&alt, &altitudeRawBits, sizeof(alt));
+    const qint32 latE7 = mavlinkFloatParamToInt32(commandLong.param1);
+    const qint32 lonE7 = mavlinkFloatParamToInt32(commandLong.param2);
+    const float alt = commandLong.param3;
+    const quint32 classIdRawBits = mavlinkFloatParamToUint32(commandLong.param4);
+    const quint32 objectIdRawBits = mavlinkFloatParamToUint32(commandLong.param5);
+    const quint32 timestampLowRawBits = mavlinkFloatParamToUint32(commandLong.param6);
+    const quint32 timestampHighRawBits = mavlinkFloatParamToUint32(commandLong.param7);
 
     const double lat = static_cast<double>(latE7) / 1e7;
     const double lon = static_cast<double>(lonE7) / 1e7;
@@ -4827,8 +4787,9 @@ void Vehicle::_pruneOneList(QmlObjectListModel& list,
             continue;
         }
 
-        GeopixelDetection* det = detectionById.value(objectId, nullptr);
-        if (!det) {
+        GeopixelDetection* detection = detectionById.value(objectId, nullptr);
+        if (!detection) {
+            // Drop stale bookkeeping if the object lookup already lost its detection instance.
             lastSeenMSecs.remove(objectId);
             detectionById.remove(objectId);
             continue;
@@ -4837,9 +4798,11 @@ void Vehicle::_pruneOneList(QmlObjectListModel& list,
         if (selectedGeopixelObjectId() == objectId) {
             setSelectedGeopixelObjectId(-1);
         }
-        if (!list.removeOne(det)) {
+
+        // Keep the QML model and hash lookup in sync before deleting the stale detection.
+        if (!list.removeOne(detection)) {
             for (int i = 0; i < list.count(); ++i) {
-                if (list.get(i) == det) {
+                if (list.get(i) == detection) {
                     list.removeAt(i);
                     break;
                 }
@@ -4849,7 +4812,7 @@ void Vehicle::_pruneOneList(QmlObjectListModel& list,
         detectionById.remove(objectId);
         lastSeenMSecs.remove(objectId);
 
-        det->deleteLater();
+        detection->deleteLater();
     }
 }
 
