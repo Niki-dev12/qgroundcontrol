@@ -22,9 +22,10 @@ import QGroundControl.FlightDisplay
 import QGroundControl.FlightMap
 
 import QGroundControl.UTMSP
-// import QGroundControl.FactSystem
+import QGroundControl.FactSystem
 
 //FPV
+// import Qt.labs.settings 1.0 
 
 /// @brief Native QML top level window
 /// All properties defined here are visible to all QML pages.
@@ -43,6 +44,14 @@ ApplicationWindow {
 
     readonly property var _activeVehicle: QGroundControl.multiVehicleManager.activeVehicle
     readonly property int _modelId: _activeVehicle ? _activeVehicle.modelId : -1
+
+    // true  -> show Analyze Tools
+    // false -> hide Analyze Tools
+    // readonly property bool _showAnalyzeTools: false
+
+    property var    _settingsManager:           QGroundControl.settingsManager
+    property var    _appSettings:               _settingsManager.appSettings
+    property Fact   _showCustomOptionalUi:      _appSettings.showCustomOptionalUi
 
     // True if currently fullscreen
     property bool isFullScreen: visibility === Window.FullScreen
@@ -163,6 +172,10 @@ ApplicationWindow {
     }
 
     function showAnalyzeTool() {
+        if (!_showCustomOptionalUi.rawValue) {
+            return
+        }
+
         showTool(qsTr("Analyze Tools"), "qrc:/qml/QGroundControl/AnalyzeView/AnalyzeView.qml", "/qmlimages/Analyze.svg")
     }
 
@@ -384,7 +397,7 @@ ApplicationWindow {
                             Layout.fillWidth:   true
                             text:               qsTr("Analyze Tools")
                             imageResource:      "/qmlimages/Analyze.svg"
-                            visible:            QGroundControl.corePlugin.showAdvancedUI
+                            visible:            mainWindow._showCustomOptionalUi.rawValue && QGroundControl.corePlugin.showAdvancedUI
                             onClicked: {
                                 if (mainWindow.allowViewSwitch()) {
                                     mainWindow.closeIndicatorDrawer()
