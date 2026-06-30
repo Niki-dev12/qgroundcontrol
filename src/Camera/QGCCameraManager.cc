@@ -27,11 +27,73 @@
 
 
 #include <cmath>
+#include <cstdint>
 #include "GimbalControllerSettings.h"
 #include "SettingsManager.h"
 
 static constexpr double kPi = M_PI;
+// fix
+static constexpr uint8_t kAcceptedCameraFovDeviceId = 1;
+static constexpr double kDefaultCameraAspect = 9.0 / 16.0;
+static constexpr double kMinUsableCameraAspect = 0.1;
+static constexpr double kMaxUsableCameraAspect = 10.0;
+static constexpr double kMinUsableFovDeg = 1.0;
+static constexpr double kMaxUsableFovDeg = 179.0;
+static constexpr double kDefaultCameraHFovDeg = 70.0;
+static constexpr double kDefaultCameraVFovDeg = 70.0;
 
+static bool _isUsableFovDeg(double fovDeg)
+{
+    return std::isfinite(fovDeg) && fovDeg > kMinUsableFovDeg && fovDeg < kMaxUsableFovDeg;
+}
+
+static bool _isMavlinkCameraComponent(uint8_t compId)
+{
+    return compId >= MAV_COMP_ID_CAMERA && compId <= MAV_COMP_ID_CAMERA6;
+}
+
+static bool _acceptCameraFovSource(const mavlink_message_t& message, const mavlink_camera_fov_status_t& fov)
+{
+    if (fov.camera_device_id == kAcceptedCameraFovDeviceId) {
+        return true;
+    }
+
+    return fov.camera_device_id == 0 && _isMavlinkCameraComponent(message.compid);
+}
+
+static double _usableCameraAspect(double aspect)
+{
+    return (std::isfinite(aspect) && aspect >= kMinUsableCameraAspect && aspect <= kMaxUsableCameraAspect)
+               ? aspect
+               : kDefaultCameraAspect;
+}
+
+static double _calculatedVfovDeg(double hfovDeg, double aspect)
+{
+    const double hfovRad = hfovDeg * kPi / 180.0;
+    const double vfovRad = 2.0 * std::atan(std::tan(hfovRad * 0.5) * aspect);
+    return vfovRad * 180.0 / kPi;
+}
+
+static double _usableOrDefaultFovDeg(double fovDeg, double defaultFovDeg)
+{
+    return _isUsableFovDeg(fovDeg) ? fovDeg : defaultFovDeg;
+}
+
+static double _settingsCameraHFovDeg()
+{
+    return _usableOrDefaultFovDeg(
+        SettingsManager::instance()->gimbalControllerSettings()->CameraHFov()->rawValue().toDouble(),
+        kDefaultCameraHFovDeg);
+}
+
+static double _settingsCameraVFovDeg()
+{
+    return _usableOrDefaultFovDeg(
+        SettingsManager::instance()->gimbalControllerSettings()->CameraVFov()->rawValue().toDouble(),
+        kDefaultCameraVFovDeg);
+}
+// fix end
 static void _cameraFovStatusRequestHandler(
     void* resultHandlerData,
     MAV_RESULT result,
@@ -844,52 +906,61 @@ double QGCCameraManager::currentCameraHFov() const
 {
     auto* cam = const_cast<QGCCameraManager*>(this)->currentCameraInstance();
     if (!cam) {
-        return std::numeric_limits<double>::quiet_NaN();
+        return _settingsCameraHFovDeg();
     }
 
     auto it = _fovByCompId.constFind(cam->compID());
-    return (it == _fovByCompId.cend()) ? std::numeric_limits<double>::quiet_NaN() : it->hfovDeg;
+    return (it == _fovByCompId.cend()) ? _settingsCameraHFovDeg() : it->hfovDeg;
 }
 
 double QGCCameraManager::currentCameraVFov() const
 {
     auto* cam = const_cast<QGCCameraManager*>(this)->currentCameraInstance();
     if (!cam) {
-        return std::numeric_limits<double>::quiet_NaN();
+        return _settingsCameraVFovDeg();
     }
 
     auto it = _fovByCompId.constFind(cam->compID());
-    return (it == _fovByCompId.cend()) ? std::numeric_limits<double>::quiet_NaN() : it->vfovDeg;
+    return (it == _fovByCompId.cend()) ? _settingsCameraVFovDeg() : it->vfovDeg;
 }
 
 void QGCCameraManager::_handleCameraFovStatus(const mavlink_message_t& message)
 {
     mavlink_camera_fov_status_t fov{};
     mavlink_msg_camera_fov_status_decode(&message, &fov);
-
-    if (!std::isfinite(fov.hfov) || fov.hfov <= 0.0 || fov.hfov >= 180.0) {
+// fix
+    if (!_vehicle || MultiVehicleManager::instance()->activeVehicle() != _vehicle || message.sysid != _vehicle->id()) {
         return;
     }
 
-    double aspect = aspectForComp(message.compid);
-    if (!std::isfinite(aspect) || aspect <= 0.0) {
-        aspect = 9.0 / 16.0;
+    if (!_acceptCameraFovSource(message, fov)) {
+        return;
     }
 
-    const double hfovRad = fov.hfov * kPi / 180.0;
-    const double vfovRad = 2.0 * std::atan(std::tan(hfovRad * 0.5) * aspect);
-    const double vfovDeg = vfovRad * 180.0 / kPi;
+    const double hfovDeg = _isUsableFovDeg(fov.hfov)
+                               ? fov.hfov
+                               : _settingsCameraHFovDeg();
 
-    if (!std::isfinite(vfovDeg) || vfovDeg <= 0.0 || vfovDeg >= 180.0) {
-        qCWarning(CameraManagerLog) << "Invalid calculated VFOV:" << vfovDeg
+    if (!_isUsableFovDeg(hfovDeg)) {
+        return;
+    }
+
+    const double aspect = _usableCameraAspect(aspectForComp(message.compid));
+    const double calculatedVfovDeg = _calculatedVfovDeg(hfovDeg, aspect);
+    const double vfovDeg = _isUsableFovDeg(fov.vfov) ? fov.vfov : calculatedVfovDeg;
+
+    if (!_isUsableFovDeg(vfovDeg)) {
+        qCWarning(CameraManagerLog) << "Invalid VFOV:" << vfovDeg
                                     << "hfov:" << fov.hfov
+                                    << "fallback/calculated hfov:" << hfovDeg
+                                    << "raw vfov:" << fov.vfov
+                                    << "calculated vfov:" << calculatedVfovDeg
                                     << "aspect:" << aspect
                                     << "compId:" << message.compid;
         return;
     }
-
-    _fovByCompId[message.compid] = { fov.hfov, vfovDeg };
-
+    _fovByCompId[message.compid] = { hfovDeg, vfovDeg };
+// fix end
     if (auto* cam = currentCameraInstance(); cam && cam->compID() == message.compid) {
         _syncCurrentCameraFovToSettings();
         emit currentCameraFovChanged();

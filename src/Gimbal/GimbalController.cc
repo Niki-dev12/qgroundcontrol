@@ -25,6 +25,18 @@
 // ─────────────────────────────────────────────
 // Local math helpers
 // ─────────────────────────────────────────────
+static constexpr float kDefaultCameraFovDeg = 70.f;
+
+static bool validCameraFov(float fovDeg)
+{
+    return std::isfinite(fovDeg) && fovDeg > 1.f && fovDeg < 179.f;
+}
+
+static float usableCameraFov(float fovDeg)
+{
+    return validCameraFov(fovDeg) ? fovDeg : kDefaultCameraFovDeg;
+}
+
 static float wrap180(float deg)
 {
     if (!std::isfinite(deg)) {
@@ -560,8 +572,8 @@ void GimbalController::gimbalOnScreenControl(float panPct, float tiltPct, bool c
     if (clickAndPoint) {
         const auto settings = SettingsManager::instance()->gimbalControllerSettings();
 
-        float hFov = settings->CameraHFov()->rawValue().toFloat();
-        float vFov = settings->CameraVFov()->rawValue().toFloat();
+        float hFov = usableCameraFov(settings->CameraHFov()->rawValue().toFloat());
+        float vFov = usableCameraFov(settings->CameraVFov()->rawValue().toFloat());
 
         if (_vehicle && _vehicle->cameraManager()) {
             QObject* cam = _vehicle->cameraManager()->property("currentCameraInstance").value<QObject*>();
@@ -576,14 +588,14 @@ void GimbalController::gimbalOnScreenControl(float panPct, float tiltPct, bool c
             if ((_readFloatProperty(cam, "horizontalFov", tmp) ||
                 _readFloatProperty(cam, "hfov", tmp) ||
                 _readFloatProperty(cam, "currentHFov", tmp)) &&
-                (tmp > 1.f) && (tmp < 179.f)) {
+                validCameraFov(tmp)) {
                 hFov = tmp;
             }
 
             if ((_readFloatProperty(cam, "verticalFov", tmp) ||
                 _readFloatProperty(cam, "vfov", tmp) ||
                 _readFloatProperty(cam, "currentVFov", tmp)) &&
-                (tmp > 1.f) && (tmp < 179.f)) {
+                validCameraFov(tmp)) {
                 vFov = tmp;
             }
         }
