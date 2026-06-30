@@ -43,6 +43,14 @@ class VehicleFactGroup : public FactGroup
     Q_PROPERTY(Fact *throttlePct            READ throttlePct            CONSTANT)
     Q_PROPERTY(Fact *imuTemp                READ imuTemp                CONSTANT)
 
+    Q_PROPERTY(Fact *specialLat             READ specialLat             CONSTANT)
+    Q_PROPERTY(Fact *specialLon             READ specialLon             CONSTANT)
+    Q_PROPERTY(Fact *specialData            READ specialData            CONSTANT)
+    //dev
+    Q_PROPERTY(Fact *user3Lat               READ user3Lat               CONSTANT)
+    Q_PROPERTY(Fact *user3Lon               READ user3Lon               CONSTANT)
+    Q_PROPERTY(Fact *user3Data              READ user3Data              CONSTANT)
+
 public:
     explicit VehicleFactGroup(QObject *parent = nullptr);
 
@@ -74,6 +82,13 @@ public:
     Fact *hobbs() { return &_hobbsFact; }
     Fact *throttlePct() { return &_throttlePctFact; }
     Fact *imuTemp() { return &_imuTempFact; }
+    Fact *specialLat() { return &_specialLatFact; }
+    Fact *specialLon() { return &_specialLonFact; }
+    Fact *specialData() { return &_specialDataFact; }
+
+    Fact *user3Lat()  { return &_user3LatFact; }
+    Fact *user3Lon()  { return &_user3LonFact; }
+    Fact *user3Data() { return &_user3DataFact; }
 
     void handleMessage(Vehicle *vehicle, const mavlink_message_t &message) override;
 
@@ -117,6 +132,13 @@ protected:
     Fact _hobbsFact = Fact(0, QStringLiteral("hobbs"), FactMetaData::valueTypeString);
     Fact _throttlePctFact = Fact(0, QStringLiteral("throttlePct"), FactMetaData::valueTypeUint16);
     Fact _imuTempFact = Fact(0, QStringLiteral("imuTemp"), FactMetaData::valueTypeInt16);
+    Fact _specialLatFact  = Fact(0, QStringLiteral("specialLat"),  FactMetaData::valueTypeDouble);
+    Fact _specialLonFact  = Fact(0, QStringLiteral("specialLon"),  FactMetaData::valueTypeDouble);
+    Fact _specialDataFact = Fact(0, QStringLiteral("specialData"), FactMetaData::valueTypeDouble);
+
+    Fact _user3LatFact  = Fact(0, QStringLiteral("user3Lat"),  FactMetaData::valueTypeDouble);
+    Fact _user3LonFact  = Fact(0, QStringLiteral("user3Lon"),  FactMetaData::valueTypeDouble);
+    Fact _user3DataFact = Fact(0, QStringLiteral("user3Data"), FactMetaData::valueTypeDouble);
 
     float _altitudeTuningOffset = qQNaN();
 

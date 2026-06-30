@@ -127,7 +127,7 @@ void QGCCameraManager::setCurrentCamera(int sel)
         _currentCameraIndex = sel;
         emit currentCameraChanged();
         emit streamChanged();
-        emit currentCameraFovChanged(); 
+        emit currentCameraFovChanged();
     }
 
     _syncCurrentCameraFovToSettings();

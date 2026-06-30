@@ -52,6 +52,18 @@ FlightMap {
     property bool   _keepVehicleCentered:       pipMode ? true : false
     property bool   _saveZoomLevelSetting:      true
 
+    property int selectedTagId: -1
+
+    signal tagClicked(int objectId)
+
+    onTagClicked: (objectId) => {
+        selectedTagId = objectId
+
+        if (_activeVehicle) {
+            _activeVehicle.selectedGeopixelObjectId =
+                (_activeVehicle.selectedGeopixelObjectId === objectId) ? -1 : objectId
+        }
+    }
 
     // Choose valid visual parent for popups
     function popupHostItem() {
@@ -240,6 +252,40 @@ FlightMap {
 
     QGCMapPalette { id: mapPal; lightColors: isSatelliteMap }
 
+    QtObject {
+        id: geoMarkerStyle
+
+        readonly property real user4Scale: 0.9
+
+        readonly property real user3Scale: 0.9
+
+        readonly property real user3MarkerSize: ScreenTools.defaultFontPixelHeight * 1.8 * user3Scale
+        readonly property real user3Stroke:     ScreenTools.defaultFontPixelHeight * 0.22 * user3Scale
+        readonly property real user3ArmScale:   1.4 * user3Scale
+        readonly property real user3LabelFontSize: ScreenTools.defaultFontPixelHeight * 0.55 * user3Scale
+
+        readonly property real markerSize: ScreenTools.defaultFontPixelHeight * 1.8 * user4Scale
+
+        readonly property real xArmLengthScale: 1.0 * user4Scale
+        readonly property real xRotationPosDeg: 45
+        readonly property real xRotationNegDeg: -45
+        readonly property bool user4Rounded: false
+
+        readonly property real user4Stroke:    ScreenTools.defaultFontPixelHeight * 0.20 * user4Scale
+        readonly property real user4StrokeSel: ScreenTools.defaultFontPixelHeight * 0.22 * user4Scale
+
+        readonly property real labelFontSize: ScreenTools.defaultFontPixelHeight * 0.55 * user4Scale
+
+        readonly property real labelBgScale: 1.15 * user4Scale
+        readonly property real labelBgOpacity: 1.0
+        readonly property string unknownIdText: "?"
+
+        readonly property color markerNormal:   mapPal ? mapPal.text : qgcPal.text
+        readonly property color markerSelected: qgcPal.warningText
+        readonly property color labelText:      Qt.rgba(0,0,0,1)
+        readonly property color labelBgColor:   Qt.rgba(1,1,1,1)
+    }
+
     Connections {
         target:                 _missionController
         ignoreUnknownSignals:   true
@@ -291,11 +337,17 @@ FlightMap {
     MapItemView {
         model: QGroundControl.multiVehicleManager.vehicles
         delegate: VehicleMapItem {
-            vehicle:        object
-            coordinate:     object.coordinate
-            map:            _root
-            size:           pipMode ? ScreenTools.defaultFontPixelHeight : ScreenTools.defaultFontPixelHeight * 3
-            z:              QGroundControl.zOrderVehicles
+            vehicle:    object
+            coordinate: object.coordinate
+            map:        _root
+            z:          QGroundControl.zOrderVehicles
+            size: {
+                const referenceMapSide = 800.0
+                const currentMapScale = Math.min(_root.width, _root.height) / referenceMapSide
+                const boundedMapScale = Math.max(0.8, Math.min(2.0, currentMapScale))
+                const baseVehicleSize = ScreenTools.defaultFontPixelHeight * 2
+                return baseVehicleSize * boundedMapScale
+            }
         }
     }
     // Add distance sensor view
@@ -381,6 +433,194 @@ FlightMap {
         delegate: CameraTriggerIndicator {
             coordinate:     object.coordinate
             z:              QGroundControl.zOrderTopMost
+        }
+    }
+
+    // Tagged item video click (USER 3)
+    MapItemView {
+        id: taggedItemsViewUser3
+        model: _activeVehicle ? _activeVehicle.geopixelDetectionsUser3 : null
+
+        delegate: MapQuickItem {
+            id: detectionItem3
+            z: QGroundControl.zOrderMapItems
+
+            readonly property bool _hasValidCoord: object && object.coordinate && object.coordinate.isValid
+            visible: _hasValidCoord
+            coordinate: _hasValidCoord ? object.coordinate : QtPositioning.coordinate()
+
+            anchorPoint.x: sourceItem.width  / 2
+            anchorPoint.y: sourceItem.height / 2
+
+            sourceItem: Item {
+                id: markerRoot3
+
+                readonly property int classId:  object ? object.classId  : -1
+                readonly property int objectId: object ? object.objectId : -1
+                readonly property real markerSize: geoMarkerStyle.user3MarkerSize
+
+                width:  markerSize
+                height: markerSize
+
+                Item {
+                    id: xMarker3
+                    anchors.fill: parent
+
+                    readonly property real strokeWidth: geoMarkerStyle.user3Stroke
+                    readonly property color lineColor:  geoMarkerStyle.markerSelected
+
+                    Rectangle {
+                        width: parent.width * geoMarkerStyle.user3ArmScale
+                        height: xMarker3.strokeWidth
+                        color: xMarker3.lineColor
+                        anchors.centerIn: parent
+                        rotation: geoMarkerStyle.xRotationPosDeg
+                        radius: xMarker3.strokeWidth / 2
+                    }
+
+                    Rectangle {
+                        width: parent.width * geoMarkerStyle.user3ArmScale
+                        height: xMarker3.strokeWidth
+                        color: xMarker3.lineColor
+                        anchors.centerIn: parent
+                        rotation: geoMarkerStyle.xRotationNegDeg
+                        radius: xMarker3.strokeWidth / 2
+                    }
+                }
+
+                QGCLabel {
+                    anchors.centerIn: parent
+                    text: markerRoot3.objectId >= 0 ? String(markerRoot3.objectId) : geoMarkerStyle.unknownIdText
+                    font.bold: true
+                    font.pixelSize: geoMarkerStyle.user3LabelFontSize
+                    color: geoMarkerStyle.labelText
+                }
+
+                MouseArea {
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+
+                    onClicked: {
+                        if (!detectionItem3._hasValidCoord || markerRoot3.objectId < 0) {
+                            return
+                        }
+
+                        _root.tagClicked(markerRoot3.objectId)
+                        _root.center = object.coordinate
+                    }
+                }
+            }
+        }
+    }
+
+    // Tagged items (USER 4)
+    MapItemView {
+        id: taggedItemsView
+        model: _activeVehicle ? _activeVehicle.geopixelDetections : null
+
+        delegate: MapQuickItem {
+            id: detectionItem
+
+            z: QGroundControl.zOrderMapItems
+
+            readonly property bool _hasValidCoord: object && object.coordinate && object.coordinate.isValid
+            visible: _hasValidCoord
+            coordinate: _hasValidCoord ? object.coordinate : QtPositioning.coordinate()
+
+            anchorPoint.x: sourceItem.width  / 2
+            anchorPoint.y: sourceItem.height / 2
+
+            sourceItem: Item {
+                id: markerRoot
+
+                readonly property int classId:  object ? object.classId  : -1
+                readonly property int objectId: object ? object.objectId : -1
+
+                readonly property bool isSelected: _activeVehicle
+                                                 && _activeVehicle.selectedGeopixelObjectId === objectId
+
+                readonly property real markerSize: geoMarkerStyle.markerSize
+
+                width:  markerSize
+                height: markerSize
+
+                Item {
+                    id: xMarker
+                    anchors.fill: parent
+
+                    readonly property real strokeWidth: markerRoot.isSelected
+                        ? geoMarkerStyle.user4StrokeSel
+                        : geoMarkerStyle.user4Stroke
+
+                    readonly property color lineColor: markerRoot.isSelected
+                        ? geoMarkerStyle.markerSelected
+                        : geoMarkerStyle.markerNormal
+
+                        Rectangle {
+                            width: parent.width * geoMarkerStyle.xArmLengthScale
+                            height: xMarker.strokeWidth
+                            color: xMarker.lineColor
+                            anchors.centerIn: parent
+                            rotation: geoMarkerStyle.xRotationPosDeg
+                            radius: geoMarkerStyle.user4Rounded ? (xMarker.strokeWidth / 2) : 0
+                        }
+
+                        Rectangle {
+                            width: parent.width * geoMarkerStyle.xArmLengthScale
+                            height: xMarker.strokeWidth
+                            color: xMarker.lineColor
+                            anchors.centerIn: parent
+                            rotation: geoMarkerStyle.xRotationNegDeg
+                            radius: geoMarkerStyle.user4Rounded ? (xMarker.strokeWidth / 2) : 0
+                        }
+                }
+
+                Item {
+                    id: labelContainer
+                    anchors.centerIn: parent
+
+                    // Label
+                    QGCLabel {
+                        id: markerLabel
+                        anchors.centerIn: parent
+                        text: markerRoot.objectId >= 0
+                            ? String(markerRoot.objectId)
+                            : geoMarkerStyle.unknownIdText
+                        font.bold: false
+                        font.pixelSize: geoMarkerStyle.labelFontSize
+                        color: geoMarkerStyle.labelText
+                    }
+
+                    // Background circle
+                    Rectangle {
+                        z: -1
+                        anchors.centerIn: parent
+                        width: Math.max(markerLabel.implicitWidth, markerLabel.implicitHeight)
+                            * geoMarkerStyle.labelBgScale
+                        height: width
+                        radius: width / 2
+                        color: xMarker.lineColor
+                        opacity: geoMarkerStyle.labelBgOpacity
+                    }
+                }
+
+                MouseArea {
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+
+                    onClicked: {
+                        const activeVehicle = QGroundControl.multiVehicleManager.activeVehicle
+                        if (!activeVehicle || !detectionItem._hasValidCoord || markerRoot.objectId < 0) {
+                            return
+                        }
+
+                        activeVehicle.selectedGeopixelObjectId = markerRoot.objectId
+                        _root.center = object.coordinate
+                    }
+                }
+            }
         }
     }
 

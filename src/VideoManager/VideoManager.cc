@@ -29,6 +29,7 @@
 
 #include <QtCore/qapplicationstatic.h>
 #include <QtCore/QDir>
+#include <QtCore/QSizeF>
 #include <QtQml/QQmlEngine>
 #include <QtQuick/QQuickItem>
 #include <QtQuick/QQuickWindow>
@@ -567,6 +568,7 @@ void VideoManager::_setActiveVehicle(Vehicle *vehicle)
 
     _activeVehicle = vehicle;
     if (_activeVehicle) {
+        _activeVehicle->setVideoStreamSize(QSizeF(_videoSize));
         (void) connect(_activeVehicle->vehicleLinkManager(), &VehicleLinkManager::communicationLostChanged, this, &VideoManager::_communicationLostChanged);
         if (_activeVehicle->cameraManager()) {
             (void) connect(_activeVehicle->cameraManager(), &QGCCameraManager::streamChanged, this, &VideoManager::_videoSourceChanged);
@@ -760,6 +762,9 @@ void VideoManager::_initVideoReceiver(VideoReceiver *receiver, QQuickWindow *win
         qCDebug(VideoManagerLog) << "Video" << receiver->name() << "resized. New resolution:" << size.width() << "x" << size.height();
         if (!receiver->isThermal()) {
             _videoSize = size;
+            if (_activeVehicle) {
+                _activeVehicle->setVideoStreamSize(QSizeF(size));
+            }
             emit videoSizeChanged();
         }
     });

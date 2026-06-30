@@ -1254,7 +1254,7 @@ void Joystick::_executeButtonAction(const QString &action, bool buttonDown)
         }
     //FPV
     } else if(action == _buttonActionCancel){
-        if (buttonDown) emit setCancel(true); 
+        if (buttonDown) emit setCancel(true);
     }else if(action == _buttonActionTrackEngage){
         if (buttonDown) emit toggleTrackEngage(true);
     }else if(action == _buttonActionHUD){
