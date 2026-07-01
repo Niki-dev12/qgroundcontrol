@@ -32,12 +32,26 @@ MapQuickItem {
     property real   _maxDistance:   isNaN(proximityValues.maxDistance)
 
     function calcSize() {
-        var scaleLinePixelLength    = 100
-        var leftCoord               = map.toCoordinate(Qt.point(0, 0), false /* clipToViewPort */)
-        var rightCoord              = map.toCoordinate(Qt.point(scaleLinePixelLength, 0), false /* clipToViewPort */)
-        var scaleLineMeters         = Math.round(leftCoord.distanceTo(rightCoord))
-        _ratio = scaleLinePixelLength / scaleLineMeters;
+        const scaleLinePixelLength = 100
+        const leftCoord = map.toCoordinate(Qt.point(0, 0), false)
+        const rightCoord = map.toCoordinate(Qt.point(scaleLinePixelLength, 0), false)
+        const scaleLineMeters = leftCoord.distanceTo(rightCoord)
+
+        if (!isFinite(scaleLineMeters) || scaleLineMeters <= 0) {
+            _ratio = 0
+            return
+        }
+
+        _ratio = scaleLinePixelLength / scaleLineMeters
     }
+
+    // function calcSize() {
+    //     var scaleLinePixelLength    = 100
+    //     var leftCoord               = map.toCoordinate(Qt.point(0, 0), false /* clipToViewPort */)
+    //     var rightCoord              = map.toCoordinate(Qt.point(scaleLinePixelLength, 0), false /* clipToViewPort */)
+    //     var scaleLineMeters         = Math.round(leftCoord.distanceTo(rightCoord))
+    //     _ratio = scaleLinePixelLength / scaleLineMeters;
+    // }
 
     ProximityRadarValues {
         id:                     proximityValues
@@ -101,11 +115,19 @@ MapQuickItem {
                 }
             }
         }
-
         Rectangle {
-            id:                 detectionLimitCircle
-            width:              proximityValues.maxDistance * 2 *_ratio
-            height:             proximityValues.maxDistance * 2 *_ratio
+            id: detectionLimitCircle
+
+            readonly property real maximumDiameter: Math.max(map.width, map.height) * 4
+            readonly property real requestedDiameter: proximityValues.maxDistance * 2 * _ratio
+
+            width: isFinite(requestedDiameter) ? Math.min(requestedDiameter, maximumDiameter) : 0
+            height: width
+
+        // Rectangle {
+        //     id:                 detectionLimitCircle
+        //     width:              proximityValues.maxDistance * 2 *_ratio
+        //     height:             proximityValues.maxDistance * 2 *_ratio
             anchors.fill:       detectionLimitCircle
             color:              Qt.rgba(1,1,1,0)
             border.color:       Qt.rgba(1,1,1,1)
