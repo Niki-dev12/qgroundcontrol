@@ -42,7 +42,7 @@ include(Git)
 # -------------------------------------------------------
 # Custom Stribog version: av3_1_2-<short git hash>
 # -------------------------------------------------------
-set(STRIBOG_BASE_VERSION "av4_1_2")
+set(STRIBOG_BASE_VERSION "av4_1_3")
 set(STRIBOG_COMMIT_SHORT "unknown")
 
 # Prefer QGC-provided hash if available
