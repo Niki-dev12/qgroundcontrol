@@ -576,23 +576,35 @@ void GimbalController::gimbalOnScreenControl(float panPct, float tiltPct, bool c
         float vFov = usableCameraFov(settings->CameraVFov()->rawValue().toFloat());
 
         if (_vehicle && _vehicle->cameraManager()) {
-            QObject* cam = _vehicle->cameraManager()->property("currentCameraInstance").value<QObject*>();
-            if (!cam) {
-                cam = _vehicle->cameraManager()->property("currentCamera").value<QObject*>();
+            QObject* cameraManager = _vehicle->cameraManager();
+            float tmp = 0.f;
+            bool hasManagerHFov = false;
+            bool hasManagerVFov = false;
+            if (_readFloatProperty(cameraManager, "currentCameraHFov", tmp) && validCameraFov(tmp)) {
+                hFov = tmp;
+                hasManagerHFov = true;
             }
-            if (!cam) {
-                cam = _vehicle->cameraManager()->property("activeCamera").value<QObject*>();
+            if (_readFloatProperty(cameraManager, "currentCameraVFov", tmp) && validCameraFov(tmp)) {
+                vFov = tmp;
+                hasManagerVFov = true;
             }
 
-            float tmp = 0.f;
-            if ((_readFloatProperty(cam, "horizontalFov", tmp) ||
+            QObject* cam = cameraManager->property("currentCameraInstance").value<QObject*>();
+            if (!cam) {
+                cam = cameraManager->property("currentCamera").value<QObject*>();
+            }
+            if (!cam) {
+                cam = cameraManager->property("activeCamera").value<QObject*>();
+            }
+
+            if (!hasManagerHFov && (_readFloatProperty(cam, "horizontalFov", tmp) ||
                 _readFloatProperty(cam, "hfov", tmp) ||
                 _readFloatProperty(cam, "currentHFov", tmp)) &&
                 validCameraFov(tmp)) {
                 hFov = tmp;
             }
 
-            if ((_readFloatProperty(cam, "verticalFov", tmp) ||
+            if (!hasManagerVFov && (_readFloatProperty(cam, "verticalFov", tmp) ||
                 _readFloatProperty(cam, "vfov", tmp) ||
                 _readFloatProperty(cam, "currentVFov", tmp)) &&
                 validCameraFov(tmp)) {

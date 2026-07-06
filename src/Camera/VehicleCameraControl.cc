@@ -1629,6 +1629,7 @@ VehicleCameraControl::handleVideoInfo(const mavlink_video_stream_information_t* 
         //-- Thermal is handled separately and not listed
         if(!pStream->isThermal()) {
             _streamLabels.append(pStream->name());
+            _streamIDs.append(pStream->streamID());
             emit streamsChanged();
             emit streamLabelsChanged();
         } else {
@@ -1658,7 +1659,14 @@ VehicleCameraControl::handleVideoStatus(const mavlink_video_stream_status_t* vs)
     qCDebug(CameraControlLog) << "handleVideoStatus:" << vs->stream_id;
     QGCVideoStreamInfo* pInfo = _findStream(vs->stream_id);
     if(pInfo) {
-        pInfo->update(*vs);
+        const quint8 previousCameraDeviceId = pInfo->cameraDeviceID();
+        const bool changed = pInfo->update(*vs);
+        if(changed && pInfo == currentStreamInstance()) {
+            emit currentStreamChanged();
+        }
+        if(previousCameraDeviceId != pInfo->cameraDeviceID() && pInfo == currentStreamInstance()) {
+            emit _vehicle->cameraManager()->streamChanged();
+        }
     }
 }
 
@@ -1705,7 +1713,7 @@ VehicleCameraControl::handleTrackingImageStatus(const mavlink_camera_tracking_im
 void
 VehicleCameraControl::setCurrentStream(int stream)
 {
-    if (stream != _currentStream && stream >= 0 && stream < _streamLabels.count()) {
+    if (stream != _currentStream && stream >= 0 && stream < _streamIDs.count()) {
         QGCVideoStreamInfo* pInfo = currentStreamInstance();
         if(pInfo) {
             qCDebug(CameraControlLog) << "Stopping stream:" << pInfo->uri();
@@ -1778,8 +1786,8 @@ VehicleCameraControl::autoStream()
 QGCVideoStreamInfo*
 VehicleCameraControl::currentStreamInstance()
 {
-    if(_currentStream < _streamLabels.count() && _streamLabels.count()) {
-        QGCVideoStreamInfo* pStream = _findStream(_streamLabels[_currentStream]);
+    if(_currentStream >= 0 && _currentStream < _streamIDs.count()) {
+        QGCVideoStreamInfo* pStream = _findStream(_streamIDs[_currentStream]);
         return pStream;
     }
     return nullptr;

@@ -12,6 +12,8 @@
 #include "MavlinkCameraControl.h"
 #include "QmlObjectListModel.h"
 
+#include <QtCore/QList>
+
 class QGCVideoStreamInfo;
 class QNetworkAccessManager;
 class QDomNode;
@@ -312,6 +314,7 @@ protected:
     QTimer                              _storageInfoTimer;
     QmlObjectListModel                  _streams;
     QStringList                         _streamLabels;
+    QList<uint8_t>                      _streamIDs;
     ThermalViewMode                     _thermalMode        = THERMAL_BLEND;
     double                              _thermalOpacity     = 85.0;
     TrackingStatus                      _trackingStatus     = TRACKING_UNKNOWN;

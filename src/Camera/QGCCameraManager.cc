@@ -143,6 +143,9 @@ QGCCameraManager::QGCCameraManager(Vehicle *vehicle)
     connect(_vehicle, &Vehicle::mavlinkMessageReceived, this, &QGCCameraManager::_mavlinkMessageReceived);
     connect(&_camerasLostHeartbeatTimer, &QTimer::timeout, this, &QGCCameraManager::_checkForLostCameras);
     connect(this, &QGCCameraManager::streamChanged, this, [this]() {
+        if (auto* cam = currentCameraInstance()) {
+            requestCameraFovForComp(cam->compID());
+        }
         _syncCurrentCameraFovToSettings();
         emit currentCameraFovChanged();
     });
