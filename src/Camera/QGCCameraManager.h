@@ -13,6 +13,7 @@
 #include "MavlinkCameraControl.h"
 
 #include <QtCore/QElapsedTimer>
+#include <QtCore/QHash>
 #include <QtCore/QLoggingCategory>
 #include <QtCore/QMap>
 #include <QtCore/QObject>
@@ -87,6 +88,7 @@ public:
 
 private:
     int _zoomValueCurrent = 0;
+    int _currentFovSourceKey() const;
     void _syncCurrentCameraFovToSettings();
 
     static bool _readFloatProperty(const QObject* obj, const char* name, float& out);
@@ -156,5 +158,5 @@ protected:
         double hfovDeg = std::numeric_limits<double>::quiet_NaN();
         double vfovDeg = std::numeric_limits<double>::quiet_NaN();
     };
-    QHash<int, FovInfo> _fovByCompId;
+    QHash<int, FovInfo> _fovBySourceKey;
 };

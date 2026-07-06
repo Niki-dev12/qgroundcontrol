@@ -24,6 +24,7 @@ class QGCVideoStreamInfo : public QObject
     Q_PROPERTY(QString  uri         READ uri            NOTIFY infoChanged)
     Q_PROPERTY(QString  name        READ name           NOTIFY infoChanged)
     Q_PROPERTY(quint8   streamID    READ streamID       NOTIFY infoChanged)
+    Q_PROPERTY(quint8   cameraDeviceID READ cameraDeviceID NOTIFY infoChanged)
     Q_PROPERTY(quint8   type        READ type           NOTIFY infoChanged)
     Q_PROPERTY(qreal    aspectRatio READ aspectRatio    NOTIFY infoChanged)
     Q_PROPERTY(quint16  hfov        READ hfov           NOTIFY infoChanged)
@@ -49,6 +50,7 @@ public:
     quint16 hfov() const { return _streamInfo.hfov; }
     quint8 type() const { return _streamInfo.type; }
     quint8 streamID() const { return _streamInfo.stream_id; }
+    quint8 cameraDeviceID() const { return _streamInfo.camera_device_id; }
     quint8 encoding() const { return _streamInfo.encoding; }
     bool isThermal() const { return (_streamInfo.flags & VIDEO_STREAM_STATUS_FLAGS_THERMAL); }
     QSize resolution() const { return QSize(_streamInfo.resolution_h, _streamInfo.resolution_v); }
