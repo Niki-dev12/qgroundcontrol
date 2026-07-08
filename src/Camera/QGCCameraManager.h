@@ -89,6 +89,8 @@ public:
 private:
     int _zoomValueCurrent = 0;
     int _currentFovSourceKey() const;
+    double _currentStreamHFovDeg() const;
+    double _currentStreamAspectForVfov() const;
     void _syncCurrentCameraFovToSettings();
 
     static bool _readFloatProperty(const QObject* obj, const char* name, float& out);

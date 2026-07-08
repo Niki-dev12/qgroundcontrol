@@ -900,6 +900,11 @@ double QGCCameraManager::currentCameraAspect(){
 
 double QGCCameraManager::currentCameraHFov() const
 {
+    const double streamHFovDeg = _currentStreamHFovDeg();
+    if (_isUsableFovDeg(streamHFovDeg)) {
+        return streamHFovDeg;
+    }
+
     const int fovSourceKey = _currentFovSourceKey();
     if (fovSourceKey < 0) {
         return _settingsCameraHFovDeg();
@@ -911,6 +916,12 @@ double QGCCameraManager::currentCameraHFov() const
 
 double QGCCameraManager::currentCameraVFov() const
 {
+    const double streamHFovDeg = _currentStreamHFovDeg();
+    if (_isUsableFovDeg(streamHFovDeg)) {
+        const double streamAspect = _currentStreamAspectForVfov();
+        return _calculatedVfovDeg(streamHFovDeg, _usableCameraAspect(streamAspect));
+    }
+
     const int fovSourceKey = _currentFovSourceKey();
     if (fovSourceKey < 0) {
         return _settingsCameraVFovDeg();
@@ -997,6 +1008,29 @@ int QGCCameraManager::_currentFovSourceKey() const
     return _fovSourceKey(cam->compID(), cameraDeviceId);
 }
 
+double QGCCameraManager::_currentStreamHFovDeg() const
+{
+    auto* manager = const_cast<QGCCameraManager*>(this);
+    auto* stream = manager->currentStreamInstance();
+    if (!stream) {
+        return std::numeric_limits<double>::quiet_NaN();
+    }
+
+    return stream->hfov();
+}
+
+double QGCCameraManager::_currentStreamAspectForVfov() const
+{
+    auto* manager = const_cast<QGCCameraManager*>(this);
+    auto* stream = manager->currentStreamInstance();
+    if (!stream || !std::isfinite(stream->aspectRatio()) || stream->aspectRatio() <= 0.0) {
+        auto* cam = manager->currentCameraInstance();
+        return cam ? aspectForComp(cam->compID()) : std::numeric_limits<double>::quiet_NaN();
+    }
+
+    return 1.0 / stream->aspectRatio();
+}
+
 void QGCCameraManager::_syncCurrentCameraFovToSettings()
 {
     auto* cam = currentCameraInstance();
@@ -1005,13 +1039,17 @@ void QGCCameraManager::_syncCurrentCameraFovToSettings()
     }
 
     auto* settings = SettingsManager::instance()->gimbalControllerSettings();
+    const double hfovDeg = currentCameraHFov();
+    const double vfovDeg = currentCameraVFov();
     const int fovSourceKey = _currentFovSourceKey();
-    const auto camFov = _fovBySourceKey.constFind(fovSourceKey);
+    const auto fovIt = _fovBySourceKey.constFind(fovSourceKey);
+    const bool hasFovStatus =
+        _isUsableFovDeg(_currentStreamHFovDeg()) ||
+        (fovIt != _fovBySourceKey.cend() && _isUsableFovDeg(fovIt->hfovDeg));
 
-    const bool hasFovStatus = (camFov != _fovBySourceKey.cend()) && std::isfinite(camFov->hfovDeg) && camFov->hfovDeg >= 0.9;
-    if (hasFovStatus) {
-        settings->CameraHFov()->setRawValue(camFov->hfovDeg);
-        settings->CameraVFov()->setRawValue(camFov->vfovDeg);
+    if (_isUsableFovDeg(hfovDeg) && _isUsableFovDeg(vfovDeg)) {
+        settings->CameraHFov()->setRawValue(hfovDeg);
+        settings->CameraVFov()->setRawValue(vfovDeg);
     }
 
     const float zoomMaxSpeed = settings->zoomMaxSpeed()->rawValue().toFloat();

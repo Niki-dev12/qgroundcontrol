@@ -38,6 +38,7 @@
 #include "QGCImageProvider.h"
 #include "QGCLoggingCategory.h"
 #include "QGCQGeoCoordinate.h"
+#include "QGCVideoStreamInfo.h"
 #include "RallyPointManager.h"
 #include "RemoteIDManager.h"
 #include "SettingsManager.h"
@@ -1448,7 +1449,7 @@ long long getFormattedTimeAsInt()
     return std::stoll(ss.str());
 }
 
-static uint8_t currentCameraStreamIndex(Vehicle* vehicle)
+static uint8_t currentCameraStreamId(Vehicle* vehicle)
 {
     if (!vehicle) {
         return 0;
@@ -1464,8 +1465,12 @@ static uint8_t currentCameraStreamIndex(Vehicle* vehicle)
         return 0;
     }
 
-    const int streamIndex = camera->currentStream();
-    return static_cast<uint8_t>(std::clamp(streamIndex, 0, 255));
+    QGCVideoStreamInfo* stream = camera->currentStreamInstance();
+    if (!stream) {
+        return 0;
+    }
+
+    return stream->streamID();
 }
 
 static float uint32ToMavlinkFloatParam(uint32_t rawValue)
@@ -1552,7 +1557,7 @@ void Vehicle::boundingBoxClick(float clickX, float clickY, float displayWidth, f
         0);
 
     const uint32_t packedClickCoordinate = packNormalizedTagClickCoordinate(normalizedX, normalizedY);
-    const uint32_t packedTagMetadata = packTagClickMetadata(0, currentCameraStreamIndex(this), 0);
+    const uint32_t packedTagMetadata = packTagClickMetadata(0, currentCameraStreamId(this), 0);
     const uint32_t packedRecipients = packTagClickRecipients(tagClickQgcSystemId, tagClickQgcComponentId, 0, 0);
 
     sendMavCommand(
