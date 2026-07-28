@@ -87,6 +87,10 @@ Rectangle {
         }
     }
 
+    function showParametersPanel() {
+        showPanel(parametersButton, "qrc:/qml/QGroundControl/VehicleSetup/SetupParameterEditor.qml")
+    }
+
     function showVehicleComponentPanel(vehicleComponent)
     {
         if (mainWindow.allowViewSwitch()) {
@@ -236,6 +240,16 @@ Rectangle {
                 property var    _activeJoystick:        joystickManager.activeJoystick
                 property bool   _buttonsOnly:           _activeJoystick ? _activeJoystick.axisCount == 0 : false
                 property bool   _forcedToButtonsOnly:   !QGroundControl.corePlugin.options.allowJoystickSelection && _buttonsOnly
+            }
+
+            ConfigButton {
+                id:                 parametersButton
+                icon.source:        "/qmlimages/Gears.svg"
+                setupComplete:      true
+                visible:            _showCustomOptionalUi.rawValue && _fullParameterVehicleAvailable
+                text:               qsTr("Parameters")
+                Layout.fillWidth:   true
+                onClicked:          showParametersPanel()
             }
 
             Repeater {
