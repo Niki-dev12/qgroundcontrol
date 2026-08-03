@@ -389,6 +389,7 @@ private:
     static constexpr const char *_buttonActionAIStrike =                    QT_TR_NOOP("FPV AI Strike"); //FPV
     static constexpr const char *_buttonActionSelectMode =                  QT_TR_NOOP("FPV Select mode"); //FPV
 
-    bool _gimbalAxisEnabled = true;
+    // Keep axis-based gimbal control disabled until dedicated gimbal axes are explicitly configured.
+    bool _gimbalAxisEnabled = false;
     int _gimbalMaxSpeed = 0;
 };

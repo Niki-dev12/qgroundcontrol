@@ -28,8 +28,6 @@
 QGC_LOGGING_CATEGORY(JoystickLog, "qgc.joystick.joystick")
 QGC_LOGGING_CATEGORY(JoystickValuesLog, "qgc.joystick.joystickvalues")
 
-#define MAX_SLIDER_POSITION 32767
-#define MIN_SLIDER_POSITION -32704
 #define STOP_CONDITION 3
 
 /*===========================================================================*/
@@ -67,6 +65,10 @@ Joystick::Joystick(const QString &name, int axisCount, int buttonCount, int hatC
     , _assignableButtonActions(new QmlObjectListModel(this))
 {
     // qCDebug(JoystickLog) << Q_FUNC_INFO << this;
+
+    for (int function = 0; function < maxFunction; function++) {
+        _rgFunctionAxis[function] = -1;
+    }
 
     for (int i = 0; i < _axisCount; i++) {
         _rgAxisValues[i] = 0;
@@ -134,8 +136,8 @@ void Joystick::_setDefaultCalibration()
     _rgFunctionAxis[yawFunction] = 0;
     _rgFunctionAxis[throttleFunction] = 1;
 
-    _rgFunctionAxis[gimbalPitchFunction] = 4;
-    _rgFunctionAxis[gimbalYawFunction] = 5;
+    _rgFunctionAxis[gimbalPitchFunction] = -1;
+    _rgFunctionAxis[gimbalYawFunction] = -1;
 
     _exponential = 0;
     _accumulator = false;
@@ -581,17 +583,6 @@ void Joystick::_handleButtons()
     }
 }
 
-static Joystick::Calibration_t makeFixedCal(int minV, int centerV, int maxV, int deadband = 0, bool reversed = false)
-{
-    Joystick::Calibration_t c{};
-    c.min = minV;
-    c.center = centerV;
-    c.max = maxV;
-    c.deadband = deadband;
-    c.reversed = reversed;
-    return c;
-}
-
 int Joystick::deadbandFromPercent(float percent, int minValue, int maxValue)
 {
     const float clampedPercent = std::clamp(percent, 0.0f, 100.0f);
@@ -627,6 +618,13 @@ void Joystick::_handleAxis()
         return;
     }
 
+    if (!_validAxis(_rgFunctionAxis[rollFunction]) ||
+        !_validAxis(_rgFunctionAxis[pitchFunction]) ||
+        !_validAxis(_rgFunctionAxis[yawFunction]) ||
+        !_validAxis(_rgFunctionAxis[throttleFunction])) {
+        return;
+    }
+
     int axis = _rgFunctionAxis[rollFunction];
     float roll = _adjustRange(_rgAxisValues[axis], _rgCalibration[axis], _deadband);
 
@@ -639,40 +637,30 @@ void Joystick::_handleAxis()
     axis = _rgFunctionAxis[throttleFunction];
     float throttle = _adjustRange(_rgAxisValues[axis], _rgCalibration[axis], (_throttleMode == ThrottleModeDownZero) ? false :_deadband);
 
+    const int gimbalPitchAxis = _rgFunctionAxis[gimbalPitchFunction];
+    const bool gimbalPitchAxisMapped = (gimbalPitchAxis >= 0) && _validAxis(gimbalPitchAxis);
     float gimbalPitch = 0.0f;
-    if (_axisCount > 4) {
-        axis = _rgFunctionAxis[gimbalPitchFunction];
-        gimbalPitch = _adjustRange(_rgAxisValues[axis], _rgCalibration[axis],_deadband);
+    if (gimbalPitchAxisMapped) {
+        gimbalPitch = _adjustRange(_rgAxisValues[gimbalPitchAxis], _rgCalibration[gimbalPitchAxis],_deadband);
     }
 
+    const int gimbalYawAxis = _rgFunctionAxis[gimbalYawFunction];
+    const bool gimbalYawAxisMapped = (gimbalYawAxis >= 0) && _validAxis(gimbalYawAxis);
     float gimbalYaw = 0.0f;
-    if (_axisCount > 5) {
-        axis = _rgFunctionAxis[gimbalYawFunction];
-        gimbalYaw = _adjustRange(_rgAxisValues[axis],   _rgCalibration[axis],_deadband);
+    if (gimbalYawAxisMapped) {
+        gimbalYaw = _adjustRange(_rgAxisValues[gimbalYawAxis], _rgCalibration[gimbalYawAxis],_deadband);
     }
 
-    if (_axisCount > 5 && _gimbalAxisEnabled) {
+    if (_gimbalAxisEnabled && (gimbalPitchAxisMapped || gimbalYawAxisMapped)) {
 
         static int zeroCount = 0;
         static bool stoppedSending = false;
 
-        const int pitchAxisIndex = _rgFunctionAxis[gimbalYawFunction];
-        const int yawAxisIndex   = 3;
-
-        const int pitchDeadband = deadbandFromPercent(15.0f, MIN_SLIDER_POSITION, MAX_SLIDER_POSITION);
-        const int yawDeadband   = deadbandFromPercent(15.0f, MIN_SLIDER_POSITION, MAX_SLIDER_POSITION);
-
-        const Calibration_t pitchCal = makeFixedCal(MIN_SLIDER_POSITION, 0, MAX_SLIDER_POSITION, /*deadband=*/pitchDeadband, /*reversed=*/true);
-        const Calibration_t yawCal   = makeFixedCal(MIN_SLIDER_POSITION, 0, MAX_SLIDER_POSITION, /*deadband=*/yawDeadband,   /*reversed=*/true);
-
-        const float pitchNorm = _adjustRange(_rgAxisValues[pitchAxisIndex], pitchCal, /*withDeadbands=*/true);
-        const float yawNorm   = _adjustRange(_rgAxisValues[yawAxisIndex],   yawCal,   /*withDeadbands=*/true);
-
         auto* setting = SettingsManager::instance()->gimbalControllerSettings();
         _gimbalMaxSpeed = setting->gimbalSpeed()->rawValue().toFloat();
 
-        const float pitchDegPerSec = pitchNorm * float(_gimbalMaxSpeed);
-        const float yawDegPerSec   = yawNorm   * float(_gimbalMaxSpeed);
+        const float pitchDegPerSec = gimbalPitch * float(_gimbalMaxSpeed);
+        const float yawDegPerSec   = gimbalYaw   * float(_gimbalMaxSpeed);
 
         const float epsilon = 0.0001f;
 
@@ -916,7 +904,7 @@ Joystick::Calibration_t Joystick::getCalibration(int axis) const
 
 void Joystick::setFunctionAxis(AxisFunction_t function, int axis)
 {
-    if (!_validAxis(axis)) {
+    if ((static_cast<int>(function) < 0) || (function >= maxFunction) || ((axis != -1) && !_validAxis(axis))) {
         return;
     }
 
@@ -930,6 +918,7 @@ int Joystick::getFunctionAxis(AxisFunction_t function) const
 {
     if ((static_cast<int>(function) < 0) || (function >= maxFunction)) {
         qCWarning(JoystickLog) << "Invalid function" << function;
+        return -1;
     }
 
     return _rgFunctionAxis[function];
@@ -1115,11 +1104,6 @@ void Joystick::setCalibrationMode(bool calibrating)
         _pollingStartedForCalibration = true;
         startPolling(MultiVehicleManager::instance()->activeVehicle());
     } else if (_pollingStartedForCalibration) {
-        if (_axisCount > 5) {
-            _rgFunctionAxis[gimbalYawFunction] = 4;
-            _rgFunctionAxis[gimbalPitchFunction] = 5;
-        }
-        _saveSettings();
         stopPolling();
     }
 }
