@@ -29,7 +29,6 @@ jobs:
       BUILD_TYPE: Release
       QT_VERSION: 6.8.3
       GST_VERSION: 1.22.12
-      ARTIFACT_DIR: ${{ runner.temp }}\qgc-artifacts
 
     steps:
       - name: Checkout custom QGC repo
@@ -111,17 +110,19 @@ jobs:
 
       - name: Collect artifacts
         shell: pwsh
+        env:
+          ARTIFACT_DIR: ${{ runner.temp }}\qgc-artifacts
         run: |
-          New-Item -ItemType Directory -Force -Path "${{ env.ARTIFACT_DIR }}" | Out-Null
-          Copy-Item "${{ runner.temp }}\shadow_build_dir\Release\QGroundControl.exe" "${{ env.ARTIFACT_DIR }}\" -Force
+          New-Item -ItemType Directory -Force -Path "$env:ARTIFACT_DIR" | Out-Null
+          Copy-Item "${{ runner.temp }}\shadow_build_dir\Release\QGroundControl.exe" "$env:ARTIFACT_DIR\" -Force
           if (Test-Path "${{ runner.temp }}\shadow_build_dir\QGroundControl-installer.exe") {
-            Copy-Item "${{ runner.temp }}\shadow_build_dir\QGroundControl-installer.exe" "${{ env.ARTIFACT_DIR }}\" -Force
+            Copy-Item "${{ runner.temp }}\shadow_build_dir\QGroundControl-installer.exe" "$env:ARTIFACT_DIR\" -Force
           }
-          Get-ChildItem "${{ env.ARTIFACT_DIR }}"
+          Get-ChildItem "$env:ARTIFACT_DIR"
 
       - name: Upload Windows build artifact
         uses: actions/upload-artifact@v4
         with:
           name: qgroundcontrol-windows-custom
-          path: ${{ env.ARTIFACT_DIR }}\*
+          path: ${{ runner.temp }}\qgc-artifacts\*
           if-no-files-found: error
