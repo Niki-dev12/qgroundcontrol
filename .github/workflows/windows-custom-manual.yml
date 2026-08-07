@@ -1,0 +1,127 @@
+name: Windows Custom Manual Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      stable_build:
+        description: "Build as stable release"
+        required: true
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+
+concurrency:
+  group: windows-custom-manual-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build Windows x64
+    runs-on: windows-latest
+
+    defaults:
+      run:
+        shell: cmd
+
+    env:
+      BUILD_TYPE: Release
+      QT_VERSION: 6.8.3
+      GST_VERSION: 1.22.12
+      ARTIFACT_DIR: ${{ runner.temp }}\qgc-artifacts
+
+    steps:
+      - name: Checkout custom QGC repo
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 1
+          fetch-tags: false
+
+      - name: Fetch tags for version metadata
+        run: git fetch --all --tags -f --depth 1
+
+      - name: Initial setup
+        uses: ./.github/actions/common
+
+      - name: Install Vulkan SDK
+        working-directory: ${{ runner.temp }}
+        shell: pwsh
+        run: |
+          Invoke-WebRequest -Uri "https://sdk.lunarg.com/sdk/download/latest/windows/vulkan-sdk.exe" -OutFile vulkan-sdk.exe
+          .\vulkan-sdk.exe --root C:\VulkanSDK\latest --accept-licenses --default-answer --confirm-command install com.lunarg.vulkan.glm com.lunarg.vulkan.volk com.lunarg.vulkan.vma com.lunarg.vulkan.debug
+          "VULKAN_SDK=C:\VulkanSDK\latest" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Install GStreamer
+        uses: blinemedical/setup-gstreamer@v1
+        with:
+          version: ${{ env.GST_VERSION }}
+
+      - name: Install NSIS
+        shell: pwsh
+        run: choco install nsis -y
+
+      - name: Setup build cache
+        uses: ./.github/actions/cache
+        with:
+          host: windows
+          target: win64_msvc2022_64
+          build-type: ${{ env.BUILD_TYPE }}
+          cpm-modules: ${{ runner.temp }}\shadow_build_dir\cpm_modules
+
+      - name: Install Qt for Windows x64
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ env.QT_VERSION }}
+          host: windows
+          target: desktop
+          arch: win64_msvc2022_64
+          dir: ${{ runner.temp }}
+          modules: qtcharts qtlocation qtpositioning qtspeech qt5compat qtmultimedia qtserialport qtimageformats qtshadertools qtconnectivity qtquick3d qtsensors
+          cache: true
+
+      - name: Set up MSVC x64 shell
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Configure
+        working-directory: ${{ runner.temp }}\shadow_build_dir
+        run: >
+          "${{ env.QT_ROOT_DIR }}\bin\qt-cmake.bat"
+          -S "${{ github.workspace }}"
+          -B .
+          -G Ninja
+          -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }}
+          -DQT_HOST_PATH="${{ env.QT_ROOT_DIR }}\..\msvc2022_64"
+          -DQGC_STABLE_BUILD=${{ inputs.stable_build == 'true' && 'ON' || 'OFF' }}
+
+      - name: Build
+        working-directory: ${{ runner.temp }}\shadow_build_dir
+        run: cmake --build . --target all --config %BUILD_TYPE%
+
+      - name: Sanity check executable
+        working-directory: ${{ runner.temp }}\shadow_build_dir\Release
+        run: QGroundControl.exe --simple-boot-test
+
+      - name: Package installer
+        working-directory: ${{ runner.temp }}\shadow_build_dir
+        run: cmake --install . --config %BUILD_TYPE%
+
+      - name: Collect artifacts
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path "${{ env.ARTIFACT_DIR }}" | Out-Null
+          Copy-Item "${{ runner.temp }}\shadow_build_dir\Release\QGroundControl.exe" "${{ env.ARTIFACT_DIR }}\" -Force
+          if (Test-Path "${{ runner.temp }}\shadow_build_dir\QGroundControl-installer.exe") {
+            Copy-Item "${{ runner.temp }}\shadow_build_dir\QGroundControl-installer.exe" "${{ env.ARTIFACT_DIR }}\" -Force
+          }
+          Get-ChildItem "${{ env.ARTIFACT_DIR }}"
+
+      - name: Upload Windows build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: qgroundcontrol-windows-custom
+          path: ${{ env.ARTIFACT_DIR }}\*
+          if-no-files-found: error
