@@ -147,6 +147,56 @@ jobs:
 
           Write-Host "Verified deployed runtime files in $bin"
 
+      - name: Verify installer payload
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem "${{ runner.temp }}\shadow_build_dir" -Filter "*-installer.exe" | Select-Object -First 1
+          if (!$installer) {
+            Write-Error "No Windows installer was produced in ${{ runner.temp }}\shadow_build_dir"
+            exit 1
+          }
+
+          $extract = Join-Path $env:RUNNER_TEMP "qgc-installer-payload"
+          Remove-Item $extract -Recurse -Force -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Force -Path $extract | Out-Null
+
+          7z x $installer.FullName "-o$extract" -y | Out-Host
+
+          $exe = Get-ChildItem $extract -Recurse -Filter "QGroundControl.exe" | Select-Object -First 1
+          if (!$exe) {
+            Write-Error "QGroundControl.exe was not found inside installer payload"
+            exit 1
+          }
+
+          $bin = $exe.Directory.FullName
+          $required = @(
+            "Qt6Core.dll",
+            "Qt6Gui.dll",
+            "Qt6Qml.dll",
+            "Qt6Quick.dll",
+            "Qt6QuickControls2.dll",
+            "Qt6Charts.dll",
+            "Qt6Sensors.dll",
+            "Qt6TextToSpeech.dll"
+          )
+
+          $missing = @()
+          foreach ($file in $required) {
+            if (!(Test-Path (Join-Path $bin $file))) {
+              $missing += $file
+            }
+          }
+
+          if ($missing.Count -gt 0) {
+            Write-Host "QGroundControl.exe was extracted to: $bin"
+            Write-Host "Files present next to extracted executable:"
+            Get-ChildItem $bin | Select-Object Name, Length | Format-Table -AutoSize
+            Write-Error "Installer payload is missing runtime files: $($missing -join ', ')"
+            exit 1
+          }
+
+          Write-Host "Verified installer payload runtime files next to $($exe.FullName)"
+
       - name: Collect artifacts
         shell: pwsh
         env:
