@@ -108,16 +108,60 @@ jobs:
         working-directory: ${{ runner.temp }}\shadow_build_dir
         run: cmake --install . --config %BUILD_TYPE%
 
+      - name: Verify deployed Windows runtime
+        shell: pwsh
+        run: |
+          $staging = "${{ runner.temp }}\shadow_build_dir\staging"
+          $bin = Join-Path $staging "bin"
+          if (!(Test-Path $bin)) {
+            Write-Error "Expected deployed bin directory was not found: $bin"
+            exit 1
+          }
+
+          $required = @(
+            "QGroundControl.exe",
+            "Qt6Core.dll",
+            "Qt6Gui.dll",
+            "Qt6Qml.dll",
+            "Qt6Quick.dll",
+            "Qt6QuickControls2.dll",
+            "Qt6Charts.dll",
+            "Qt6Sensors.dll",
+            "Qt6TextToSpeech.dll"
+          )
+
+          $missing = @()
+          foreach ($file in $required) {
+            $path = Join-Path $bin $file
+            if (!(Test-Path $path)) {
+              $missing += $file
+            }
+          }
+
+          if ($missing.Count -gt 0) {
+            Write-Host "Files present in deployed bin directory:"
+            Get-ChildItem $bin | Select-Object Name, Length | Format-Table -AutoSize
+            Write-Error "Missing deployed runtime files: $($missing -join ', ')"
+            exit 1
+          }
+
+          Write-Host "Verified deployed runtime files in $bin"
+
       - name: Collect artifacts
         shell: pwsh
         env:
           ARTIFACT_DIR: ${{ runner.temp }}\qgc-artifacts
         run: |
           New-Item -ItemType Directory -Force -Path "$env:ARTIFACT_DIR" | Out-Null
-          Copy-Item "${{ runner.temp }}\shadow_build_dir\Release\QGroundControl.exe" "$env:ARTIFACT_DIR\" -Force
-          if (Test-Path "${{ runner.temp }}\shadow_build_dir\QGroundControl-installer.exe") {
-            Copy-Item "${{ runner.temp }}\shadow_build_dir\QGroundControl-installer.exe" "$env:ARTIFACT_DIR\" -Force
+
+          $installer = Get-ChildItem "${{ runner.temp }}\shadow_build_dir" -Filter "*-installer.exe" | Select-Object -First 1
+          if (!$installer) {
+            Write-Error "No Windows installer was produced in ${{ runner.temp }}\shadow_build_dir"
+            exit 1
           }
+          Copy-Item $installer.FullName "$env:ARTIFACT_DIR\" -Force
+
+          Compress-Archive -Path "${{ runner.temp }}\shadow_build_dir\staging\*" -DestinationPath "$env:ARTIFACT_DIR\QGroundControl-deployed-staging.zip" -Force
           Get-ChildItem "$env:ARTIFACT_DIR"
 
       - name: Upload Windows build artifact
