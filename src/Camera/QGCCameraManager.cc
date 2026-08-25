@@ -532,9 +532,20 @@ QGCCameraManager::_handleVideoStreamStatus(const mavlink_message_t& message)
 {
     auto pCamera = _findCamera(message.compid);
     if(pCamera) {
+        const double previousHFov = currentCameraHFov();
+        const double previousVFov = currentCameraVFov();
+
         mavlink_video_stream_status_t streamStatus;
         mavlink_msg_video_stream_status_decode(&message, &streamStatus);
         pCamera->handleVideoStatus(&streamStatus);
+
+        const double currentHFov = currentCameraHFov();
+        const double currentVFov = currentCameraVFov();
+        if (std::abs(currentHFov - previousHFov) > 0.001 ||
+            std::abs(currentVFov - previousVFov) > 0.001) {
+            _syncCurrentCameraFovToSettings();
+            emit currentCameraFovChanged();
+        }
     }
 }
 
@@ -903,37 +914,36 @@ double QGCCameraManager::currentCameraAspect(){
 
 double QGCCameraManager::currentCameraHFov() const
 {
-    const double streamHFovDeg = _currentStreamHFovDeg();
-    if (_isUsableFovDeg(streamHFovDeg)) {
-        return streamHFovDeg;
-    }
-
     int compId = 0;
     uint8_t cameraDeviceId = 0;
-    if (!_currentCameraFovIds(compId, cameraDeviceId)) {
-        return _settingsCameraHFovDeg();
+    if (_currentCameraFovIds(compId, cameraDeviceId)) {
+        const FovInfo* fovInfo = _cameraDeviceFovInfo(compId, cameraDeviceId);
+        if (fovInfo && _isUsableFovDeg(fovInfo->hfovDeg)) {
+            return fovInfo->hfovDeg;
+        }
     }
 
-    const FovInfo* fovInfo = _cameraDeviceFovInfo(compId, cameraDeviceId);
-    return fovInfo ? fovInfo->hfovDeg : _settingsCameraHFovDeg();
+    const double streamHFovDeg = _currentStreamHFovDeg();
+    return _isUsableFovDeg(streamHFovDeg) ? streamHFovDeg : _settingsCameraHFovDeg();
 }
 
 double QGCCameraManager::currentCameraVFov() const
 {
-    const double streamHFovDeg = _currentStreamHFovDeg();
-    if (_isUsableFovDeg(streamHFovDeg)) {
-        const double streamAspect = _currentStreamAspectForVfov();
-        return _calculatedVfovDeg(streamHFovDeg, _usableCameraAspect(streamAspect));
-    }
-
     int compId = 0;
     uint8_t cameraDeviceId = 0;
-    if (!_currentCameraFovIds(compId, cameraDeviceId)) {
-        return _settingsCameraVFovDeg();
+    if (_currentCameraFovIds(compId, cameraDeviceId)) {
+        const FovInfo* fovInfo = _cameraDeviceFovInfo(compId, cameraDeviceId);
+        if (fovInfo && _isUsableFovDeg(fovInfo->vfovDeg)) {
+            return fovInfo->vfovDeg;
+        }
     }
 
-    const FovInfo* fovInfo = _cameraDeviceFovInfo(compId, cameraDeviceId);
-    return fovInfo ? fovInfo->vfovDeg : _settingsCameraVFovDeg();
+    const double streamHFovDeg = _currentStreamHFovDeg();
+    if (_isUsableFovDeg(streamHFovDeg)) {
+        return _calculatedVfovDeg(streamHFovDeg, _usableCameraAspect(_currentStreamAspectForVfov()));
+    }
+
+    return _settingsCameraVFovDeg();
 }
 
 void QGCCameraManager::_handleCameraFovStatus(const mavlink_message_t& message)
@@ -948,8 +958,7 @@ void QGCCameraManager::_handleCameraFovStatus(const mavlink_message_t& message)
     int currentCompId = 0;
     uint8_t currentCameraDeviceId = 0;
     if (!_currentCameraFovIds(currentCompId, currentCameraDeviceId) ||
-        message.compid != currentCompId ||
-        fov.camera_device_id != currentCameraDeviceId) {
+        message.compid != currentCompId) {
         return;
     }
 
@@ -1025,6 +1034,9 @@ const QGCCameraManager::FovInfo* QGCCameraManager::_cameraDeviceFovInfo(int comp
 
     const auto cameraDeviceIt = componentIt->fovByCameraDeviceId.constFind(cameraDeviceId);
     if (cameraDeviceIt == componentIt->fovByCameraDeviceId.cend()) {
+        if (cameraDeviceId == 0 && componentIt->fovByCameraDeviceId.size() == 1) {
+            return &componentIt->fovByCameraDeviceId.constBegin().value();
+        }
         return nullptr;
     }
 
