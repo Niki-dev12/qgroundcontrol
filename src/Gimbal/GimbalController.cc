@@ -25,6 +25,18 @@
 // ─────────────────────────────────────────────
 // Local math helpers
 // ─────────────────────────────────────────────
+static constexpr float kDefaultCameraFovDeg = 70.f;
+
+static bool validCameraFov(float fovDeg)
+{
+    return std::isfinite(fovDeg) && fovDeg > 1.f && fovDeg < 179.f;
+}
+
+static float usableCameraFov(float fovDeg)
+{
+    return validCameraFov(fovDeg) ? fovDeg : kDefaultCameraFovDeg;
+}
+
 static float wrap180(float deg)
 {
     if (!std::isfinite(deg)) {
@@ -560,30 +572,42 @@ void GimbalController::gimbalOnScreenControl(float panPct, float tiltPct, bool c
     if (clickAndPoint) {
         const auto settings = SettingsManager::instance()->gimbalControllerSettings();
 
-        float hFov = settings->CameraHFov()->rawValue().toFloat();
-        float vFov = settings->CameraVFov()->rawValue().toFloat();
+        float hFov = usableCameraFov(settings->CameraHFov()->rawValue().toFloat());
+        float vFov = usableCameraFov(settings->CameraVFov()->rawValue().toFloat());
 
         if (_vehicle && _vehicle->cameraManager()) {
-            QObject* cam = _vehicle->cameraManager()->property("currentCameraInstance").value<QObject*>();
-            if (!cam) {
-                cam = _vehicle->cameraManager()->property("currentCamera").value<QObject*>();
+            QObject* cameraManager = _vehicle->cameraManager();
+            float tmp = 0.f;
+            bool hasManagerHFov = false;
+            bool hasManagerVFov = false;
+            if (_readFloatProperty(cameraManager, "currentCameraHFov", tmp) && validCameraFov(tmp)) {
+                hFov = tmp;
+                hasManagerHFov = true;
             }
-            if (!cam) {
-                cam = _vehicle->cameraManager()->property("activeCamera").value<QObject*>();
+            if (_readFloatProperty(cameraManager, "currentCameraVFov", tmp) && validCameraFov(tmp)) {
+                vFov = tmp;
+                hasManagerVFov = true;
             }
 
-            float tmp = 0.f;
-            if ((_readFloatProperty(cam, "horizontalFov", tmp) ||
+            QObject* cam = cameraManager->property("currentCameraInstance").value<QObject*>();
+            if (!cam) {
+                cam = cameraManager->property("currentCamera").value<QObject*>();
+            }
+            if (!cam) {
+                cam = cameraManager->property("activeCamera").value<QObject*>();
+            }
+
+            if (!hasManagerHFov && (_readFloatProperty(cam, "horizontalFov", tmp) ||
                 _readFloatProperty(cam, "hfov", tmp) ||
                 _readFloatProperty(cam, "currentHFov", tmp)) &&
-                (tmp > 1.f) && (tmp < 179.f)) {
+                validCameraFov(tmp)) {
                 hFov = tmp;
             }
 
-            if ((_readFloatProperty(cam, "verticalFov", tmp) ||
+            if (!hasManagerVFov && (_readFloatProperty(cam, "verticalFov", tmp) ||
                 _readFloatProperty(cam, "vfov", tmp) ||
                 _readFloatProperty(cam, "currentVFov", tmp)) &&
-                (tmp > 1.f) && (tmp < 179.f)) {
+                validCameraFov(tmp)) {
                 vFov = tmp;
             }
         }
