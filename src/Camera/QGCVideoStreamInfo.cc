@@ -36,6 +36,11 @@ bool QGCVideoStreamInfo::update(const mavlink_video_stream_status_t &status)
         _streamInfo.hfov = status.hfov;
     }
 
+    if (_streamInfo.camera_device_id != status.camera_device_id) {
+        changed = true;
+        _streamInfo.camera_device_id = status.camera_device_id;
+    }
+
     if (_streamInfo.flags != status.flags) {
         changed = true;
         _streamInfo.flags = status.flags;

@@ -13,6 +13,7 @@
 #include "MavlinkCameraControl.h"
 
 #include <QtCore/QElapsedTimer>
+#include <QtCore/QHash>
 #include <QtCore/QLoggingCategory>
 #include <QtCore/QMap>
 #include <QtCore/QObject>
@@ -86,7 +87,21 @@ public:
     void handleCameraFovStatusFromRequest(const mavlink_message_t& message);
 
 private:
+    struct FovInfo {
+        double hfovDeg = std::numeric_limits<double>::quiet_NaN();
+        double vfovDeg = std::numeric_limits<double>::quiet_NaN();
+    };
+
+    struct CameraComponentFovInfo {
+        QHash<uint8_t, FovInfo> fovByCameraDeviceId;
+    };
+
     int _zoomValueCurrent = 0;
+    bool _currentCameraFovIds(int& compId, uint8_t& cameraDeviceId) const;
+    const FovInfo* _cameraDeviceFovInfo(int compId, uint8_t cameraDeviceId) const;
+    double _currentStreamHFovDeg() const;
+    double _currentStreamAspectForVfov() const;
+    void _handleStreamChanged();
     void _syncCurrentCameraFovToSettings();
 
     static bool _readFloatProperty(const QObject* obj, const char* name, float& out);
@@ -152,9 +167,5 @@ protected:
 
     QHash<int, double> _aspectByCompId;
 
-    struct FovInfo {
-        double hfovDeg = std::numeric_limits<double>::quiet_NaN();
-        double vfovDeg = std::numeric_limits<double>::quiet_NaN();
-    };
-    QHash<int, FovInfo> _fovByCompId;
+    QHash<int, CameraComponentFovInfo> _fovByCameraComponent;
 };

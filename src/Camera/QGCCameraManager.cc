@@ -27,10 +27,58 @@
 
 
 #include <cmath>
+#include <cstdint>
 #include "GimbalControllerSettings.h"
 #include "SettingsManager.h"
 
 static constexpr double kPi = M_PI;
+static constexpr double kDefaultCameraAspect = 9.0 / 16.0;
+static constexpr double kMinUsableCameraAspect = 0.1;
+static constexpr double kMaxUsableCameraAspect = 10.0;
+static constexpr double kMinUsableFovDeg = 1.0;
+static constexpr double kMaxUsableFovDeg = 179.0;
+static constexpr double kDefaultCameraHFovDeg = 70.0;
+static constexpr double kDefaultCameraVFovDeg = 70.0;
+
+static bool _isUsableFovDeg(double fovDeg)
+{
+    return std::isfinite(fovDeg) && fovDeg > kMinUsableFovDeg && fovDeg < kMaxUsableFovDeg;
+}
+
+static double _usableCameraAspect(double aspect)
+{
+    if (std::isfinite(aspect) && aspect >= kMinUsableCameraAspect && aspect <= kMaxUsableCameraAspect) {
+        return aspect;
+    }
+
+    return kDefaultCameraAspect;
+}
+
+static double _calculatedVfovDeg(double hfovDeg, double aspect)
+{
+    const double hfovRad = hfovDeg * kPi / 180.0;
+    const double vfovRad = 2.0 * std::atan(std::tan(hfovRad * 0.5) * aspect);
+    return vfovRad * 180.0 / kPi;
+}
+
+static double _usableOrDefaultFovDeg(double fovDeg, double defaultFovDeg)
+{
+    return _isUsableFovDeg(fovDeg) ? fovDeg : defaultFovDeg;
+}
+
+static double _settingsCameraHFovDeg()
+{
+    return _usableOrDefaultFovDeg(
+        SettingsManager::instance()->gimbalControllerSettings()->CameraHFov()->rawValue().toDouble(),
+        kDefaultCameraHFovDeg);
+}
+
+static double _settingsCameraVFovDeg()
+{
+    return _usableOrDefaultFovDeg(
+        SettingsManager::instance()->gimbalControllerSettings()->CameraVFov()->rawValue().toDouble(),
+        kDefaultCameraVFovDeg);
+}
 
 static void _cameraFovStatusRequestHandler(
     void* resultHandlerData,
@@ -91,6 +139,7 @@ QGCCameraManager::QGCCameraManager(Vehicle *vehicle)
     connect(MultiVehicleManager::instance(), &MultiVehicleManager::parameterReadyVehicleAvailableChanged, this, &QGCCameraManager::_vehicleReady);
     connect(_vehicle, &Vehicle::mavlinkMessageReceived, this, &QGCCameraManager::_mavlinkMessageReceived);
     connect(&_camerasLostHeartbeatTimer, &QTimer::timeout, this, &QGCCameraManager::_checkForLostCameras);
+    connect(this, &QGCCameraManager::streamChanged, this, &QGCCameraManager::_handleStreamChanged);
 
     _camerasLostHeartbeatTimer.setSingleShot(false);
     _lastZoomChange.start();
@@ -135,6 +184,16 @@ void QGCCameraManager::setCurrentCamera(int sel)
     if (auto* cam = currentCameraInstance()) {
         requestCameraFovForComp(cam->compID());
     }
+}
+
+void QGCCameraManager::_handleStreamChanged()
+{
+    if (auto* cam = currentCameraInstance()) {
+        requestCameraFovForComp(cam->compID());
+    }
+
+    _syncCurrentCameraFovToSettings();
+    emit currentCameraFovChanged();
 }
 
 void QGCCameraManager::_vehicleReady(bool ready)
@@ -347,8 +406,10 @@ void QGCCameraManager::_handleCameraInfo(const mavlink_message_t& message)
 void QGCCameraManager::_checkForLostCameras()
 {
     //-- Iterate cameras
-    for (auto it = _cameraInfoRequest.constBegin(); it != _cameraInfoRequest.constEnd(); ++it) {
-        const QString &sCompID = it.key();
+    for (auto cameraInfoRequestIterator = _cameraInfoRequest.constBegin();
+         cameraInfoRequestIterator != _cameraInfoRequest.constEnd();
+         ++cameraInfoRequestIterator) {
+        const QString &sCompID = cameraInfoRequestIterator.key();
         if (_cameraInfoRequest[sCompID]) {
             CameraStruct* pInfo = _cameraInfoRequest[sCompID];
             //-- Have we received a camera info message?
@@ -471,9 +532,20 @@ QGCCameraManager::_handleVideoStreamStatus(const mavlink_message_t& message)
 {
     auto pCamera = _findCamera(message.compid);
     if(pCamera) {
+        const double previousHFov = currentCameraHFov();
+        const double previousVFov = currentCameraVFov();
+
         mavlink_video_stream_status_t streamStatus;
         mavlink_msg_video_stream_status_decode(&message, &streamStatus);
         pCamera->handleVideoStatus(&streamStatus);
+
+        const double currentHFov = currentCameraHFov();
+        const double currentVFov = currentCameraVFov();
+        if (std::abs(currentHFov - previousHFov) > 0.001 ||
+            std::abs(currentVFov - previousVFov) > 0.001) {
+            _syncCurrentCameraFovToSettings();
+            emit currentCameraFovChanged();
+        }
     }
 }
 
@@ -827,10 +899,10 @@ void QGCCameraManager::requestCameraFovForComp(int compId) {
 
 //-----------------------------------------------------------------------------
 double QGCCameraManager::aspectForComp(int compId) const {
-    auto it = _aspectByCompId.constFind(compId);
-    return (it == _aspectByCompId.cend())
+    auto aspectForComponent = _aspectByCompId.constFind(compId);
+    return (aspectForComponent == _aspectByCompId.cend())
            ? std::numeric_limits<double>::quiet_NaN()
-           : it.value();
+           : aspectForComponent.value();
 }
 
 double QGCCameraManager::currentCameraAspect(){
@@ -842,24 +914,36 @@ double QGCCameraManager::currentCameraAspect(){
 
 double QGCCameraManager::currentCameraHFov() const
 {
-    auto* cam = const_cast<QGCCameraManager*>(this)->currentCameraInstance();
-    if (!cam) {
-        return std::numeric_limits<double>::quiet_NaN();
+    int compId = 0;
+    uint8_t cameraDeviceId = 0;
+    if (_currentCameraFovIds(compId, cameraDeviceId)) {
+        const FovInfo* fovInfo = _cameraDeviceFovInfo(compId, cameraDeviceId);
+        if (fovInfo && _isUsableFovDeg(fovInfo->hfovDeg)) {
+            return fovInfo->hfovDeg;
+        }
     }
 
-    auto it = _fovByCompId.constFind(cam->compID());
-    return (it == _fovByCompId.cend()) ? std::numeric_limits<double>::quiet_NaN() : it->hfovDeg;
+    const double streamHFovDeg = _currentStreamHFovDeg();
+    return _isUsableFovDeg(streamHFovDeg) ? streamHFovDeg : _settingsCameraHFovDeg();
 }
 
 double QGCCameraManager::currentCameraVFov() const
 {
-    auto* cam = const_cast<QGCCameraManager*>(this)->currentCameraInstance();
-    if (!cam) {
-        return std::numeric_limits<double>::quiet_NaN();
+    int compId = 0;
+    uint8_t cameraDeviceId = 0;
+    if (_currentCameraFovIds(compId, cameraDeviceId)) {
+        const FovInfo* fovInfo = _cameraDeviceFovInfo(compId, cameraDeviceId);
+        if (fovInfo && _isUsableFovDeg(fovInfo->vfovDeg)) {
+            return fovInfo->vfovDeg;
+        }
     }
 
-    auto it = _fovByCompId.constFind(cam->compID());
-    return (it == _fovByCompId.cend()) ? std::numeric_limits<double>::quiet_NaN() : it->vfovDeg;
+    const double streamHFovDeg = _currentStreamHFovDeg();
+    if (_isUsableFovDeg(streamHFovDeg)) {
+        return _calculatedVfovDeg(streamHFovDeg, _usableCameraAspect(_currentStreamAspectForVfov()));
+    }
+
+    return _settingsCameraVFovDeg();
 }
 
 void QGCCameraManager::_handleCameraFovStatus(const mavlink_message_t& message)
@@ -867,33 +951,43 @@ void QGCCameraManager::_handleCameraFovStatus(const mavlink_message_t& message)
     mavlink_camera_fov_status_t fov{};
     mavlink_msg_camera_fov_status_decode(&message, &fov);
 
-    if (!std::isfinite(fov.hfov) || fov.hfov <= 0.0 || fov.hfov >= 180.0) {
+    if (!_vehicle || MultiVehicleManager::instance()->activeVehicle() != _vehicle || message.sysid != _vehicle->id()) {
         return;
     }
 
-    double aspect = aspectForComp(message.compid);
-    if (!std::isfinite(aspect) || aspect <= 0.0) {
-        aspect = 9.0 / 16.0;
+    int currentCompId = 0;
+    uint8_t currentCameraDeviceId = 0;
+    if (!_currentCameraFovIds(currentCompId, currentCameraDeviceId) ||
+        message.compid != currentCompId) {
+        return;
     }
 
-    const double hfovRad = fov.hfov * kPi / 180.0;
-    const double vfovRad = 2.0 * std::atan(std::tan(hfovRad * 0.5) * aspect);
-    const double vfovDeg = vfovRad * 180.0 / kPi;
+    const double hfovDeg = _isUsableFovDeg(fov.hfov)
+                               ? fov.hfov
+                               : _settingsCameraHFovDeg();
 
-    if (!std::isfinite(vfovDeg) || vfovDeg <= 0.0 || vfovDeg >= 180.0) {
-        qCWarning(CameraManagerLog) << "Invalid calculated VFOV:" << vfovDeg
+    if (!_isUsableFovDeg(hfovDeg)) {
+        return;
+    }
+
+    const double aspect = _usableCameraAspect(aspectForComp(message.compid));
+    const double calculatedVfovDeg = _calculatedVfovDeg(hfovDeg, aspect);
+    const double vfovDeg = _isUsableFovDeg(fov.vfov) ? fov.vfov : calculatedVfovDeg;
+
+    if (!_isUsableFovDeg(vfovDeg)) {
+        qCWarning(CameraManagerLog) << "Invalid VFOV:" << vfovDeg
                                     << "hfov:" << fov.hfov
+                                    << "fallback/calculated hfov:" << hfovDeg
+                                    << "raw vfov:" << fov.vfov
+                                    << "calculated vfov:" << calculatedVfovDeg
                                     << "aspect:" << aspect
                                     << "compId:" << message.compid;
         return;
     }
+    _fovByCameraComponent[message.compid].fovByCameraDeviceId[fov.camera_device_id] = { hfovDeg, vfovDeg };
 
-    _fovByCompId[message.compid] = { fov.hfov, vfovDeg };
-
-    if (auto* cam = currentCameraInstance(); cam && cam->compID() == message.compid) {
-        _syncCurrentCameraFovToSettings();
-        emit currentCameraFovChanged();
-    }
+    _syncCurrentCameraFovToSettings();
+    emit currentCameraFovChanged();
 }
 
 bool QGCCameraManager::_readFloatProperty(const QObject* object, const char* propertyName, float& valueOut)
@@ -917,6 +1011,61 @@ bool QGCCameraManager::_readFloatProperty(const QObject* object, const char* pro
     return true;
 }
 
+bool QGCCameraManager::_currentCameraFovIds(int& compId, uint8_t& cameraDeviceId) const
+{
+    auto* manager = const_cast<QGCCameraManager*>(this);
+    auto* cam = manager->currentCameraInstance();
+    if (!cam) {
+        return false;
+    }
+
+    auto* stream = manager->currentStreamInstance();
+    compId = cam->compID();
+    cameraDeviceId = stream ? stream->cameraDeviceID() : 0;
+    return true;
+}
+
+const QGCCameraManager::FovInfo* QGCCameraManager::_cameraDeviceFovInfo(int compId, uint8_t cameraDeviceId) const
+{
+    const auto componentIt = _fovByCameraComponent.constFind(compId);
+    if (componentIt == _fovByCameraComponent.cend()) {
+        return nullptr;
+    }
+
+    const auto cameraDeviceIt = componentIt->fovByCameraDeviceId.constFind(cameraDeviceId);
+    if (cameraDeviceIt == componentIt->fovByCameraDeviceId.cend()) {
+        if (cameraDeviceId == 0 && componentIt->fovByCameraDeviceId.size() == 1) {
+            return &componentIt->fovByCameraDeviceId.constBegin().value();
+        }
+        return nullptr;
+    }
+
+    return &cameraDeviceIt.value();
+}
+
+double QGCCameraManager::_currentStreamHFovDeg() const
+{
+    auto* manager = const_cast<QGCCameraManager*>(this);
+    auto* stream = manager->currentStreamInstance();
+    if (!stream) {
+        return std::numeric_limits<double>::quiet_NaN();
+    }
+
+    return stream->hfov();
+}
+
+double QGCCameraManager::_currentStreamAspectForVfov() const
+{
+    auto* manager = const_cast<QGCCameraManager*>(this);
+    auto* stream = manager->currentStreamInstance();
+    if (!stream || !std::isfinite(stream->aspectRatio()) || stream->aspectRatio() <= 0.0) {
+        auto* cam = manager->currentCameraInstance();
+        return cam ? aspectForComp(cam->compID()) : std::numeric_limits<double>::quiet_NaN();
+    }
+
+    return 1.0 / stream->aspectRatio();
+}
+
 void QGCCameraManager::_syncCurrentCameraFovToSettings()
 {
     auto* cam = currentCameraInstance();
@@ -925,13 +1074,20 @@ void QGCCameraManager::_syncCurrentCameraFovToSettings()
     }
 
     auto* settings = SettingsManager::instance()->gimbalControllerSettings();
-    const int compId = cam->compID();
-    const auto camFov = _fovByCompId.constFind(compId);
+    const double hfovDeg = currentCameraHFov();
+    const double vfovDeg = currentCameraVFov();
+    int compId = 0;
+    uint8_t cameraDeviceId = 0;
+    const FovInfo* fovInfo = _currentCameraFovIds(compId, cameraDeviceId)
+                                 ? _cameraDeviceFovInfo(compId, cameraDeviceId)
+                                 : nullptr;
+    const bool hasFovStatus =
+        _isUsableFovDeg(_currentStreamHFovDeg()) ||
+        (fovInfo && _isUsableFovDeg(fovInfo->hfovDeg));
 
-    const bool hasFovStatus = (camFov != _fovByCompId.cend()) && std::isfinite(camFov->hfovDeg) && camFov->hfovDeg >= 0.9;
-    if (hasFovStatus) {
-        settings->CameraHFov()->setRawValue(camFov->hfovDeg);
-        settings->CameraVFov()->setRawValue(camFov->vfovDeg);
+    if (_isUsableFovDeg(hfovDeg) && _isUsableFovDeg(vfovDeg)) {
+        settings->CameraHFov()->setRawValue(hfovDeg);
+        settings->CameraVFov()->setRawValue(vfovDeg);
     }
 
     const float zoomMaxSpeed = settings->zoomMaxSpeed()->rawValue().toFloat();

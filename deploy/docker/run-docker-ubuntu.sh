@@ -28,7 +28,7 @@ if [ -z "$APPIMAGE_PATH" ]; then
 fi
 
 DIR=$(dirname "$APPIMAGE_PATH")
-STRIBOG_BASE="av4_1_3"
+STRIBOG_BASE="av4_2_4"
 GIT_HASH=$(git -C "${SOURCE_DIR}" rev-parse --short=7 HEAD 2>/dev/null || echo "nogit")
 NEW_NAME="QGroundControl-${STRIBOG_BASE}-${GIT_HASH}.AppImage"
 mv -f "$APPIMAGE_PATH" "${DIR}/${NEW_NAME}"
