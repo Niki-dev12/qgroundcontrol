@@ -100,22 +100,18 @@ QMap<QString, Joystick*> JoystickGetacSerial::discover()
         if (!newRet[name]) {
             newRet[name] = new JoystickGetacSerial(forcedPort);
         }
-    }
+    } else {
+        for (const QSerialPortInfo &portInfo : QSerialPortInfo::availablePorts()) {
+            if (!_isGetacPort(portInfo)) {
+                continue;
+            }
 
-    for (const QSerialPortInfo &portInfo : QSerialPortInfo::availablePorts()) {
-        if (!_isGetacPort(portInfo)) {
-            continue;
-        }
-
-        const QString portName = portInfo.portName();
-        const QString name = QStringLiteral("Getac Serial Controller (%1)").arg(portName);
-        if (newRet.contains(name)) {
-            continue;
-        }
-
-        newRet[name] = ret.take(name);
-        if (!newRet[name]) {
-            newRet[name] = new JoystickGetacSerial(portName);
+            const QString portName = portInfo.portName();
+            const QString name = QStringLiteral("Getac Serial Controller (%1)").arg(portName);
+            newRet[name] = ret.take(name);
+            if (!newRet[name]) {
+                newRet[name] = new JoystickGetacSerial(portName);
+            }
         }
     }
 

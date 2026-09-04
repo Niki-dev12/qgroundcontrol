@@ -23,6 +23,11 @@ static bool _isT20Name(const QString& n)
     return n.contains("T20", Qt::CaseInsensitive);
 }
 
+static bool _isGetacIntegratedJoystickName(const QString& name)
+{
+    return name.contains("Getac", Qt::CaseInsensitive) || _isT20Name(name);
+}
+
 JoystickSDL::JoystickSDL(const QString &name, int axisCount, int buttonCount, int hatCount, int index, bool isGameController, QObject *parent)
     : Joystick(name, axisCount, buttonCount, hatCount, parent)
     , _isGameController(isGameController)
@@ -63,6 +68,12 @@ QMap<QString, Joystick*> JoystickSDL::discover()
 
     for (int i = 0; i < SDL_NumJoysticks(); i++) {
         QString name = SDL_JoystickNameForIndex(i);
+#ifdef QGC_GETAC_SERIAL_JOYSTICK
+        if (_isGetacIntegratedJoystickName(name)) {
+            qCInfo(JoystickSDLLog) << "Ignoring Getac HID joystick, using serial backend instead:" << name;
+            continue;
+        }
+#endif
         if (ret.contains(name)) {
             newRet[name] = ret[name];
             JoystickSDL *const joystick = static_cast<JoystickSDL*>(newRet[name]);
