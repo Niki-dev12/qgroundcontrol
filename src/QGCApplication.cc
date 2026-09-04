@@ -41,6 +41,9 @@
 #include "ESP8266ComponentController.h"
 #include "FollowMe.h"
 #include "GeoTagController.h"
+#ifdef QGC_GETAC_SERIAL_JOYSTICK
+#include "GetacJoystickDebugger.h"
+#endif
 #include "GimbalController.h"
 #include "GPSRtk.h"
 #include "JoystickConfigController.h"
@@ -308,6 +311,9 @@ void QGCApplication::init()
     qmlRegisterType<FirmwareUpgradeController>("QGroundControl.Controllers", 1, 0, "FirmwareUpgradeController");
 #endif
     qmlRegisterType<JoystickConfigController>("QGroundControl.Controllers", 1, 0, "JoystickConfigController");
+#ifdef QGC_GETAC_SERIAL_JOYSTICK
+    qmlRegisterType<GetacJoystickDebugger>("QGroundControl.Controllers", 1, 0, "GetacJoystickDebugger");
+#endif
 
     (void) qmlRegisterSingletonType<ShapeFileHelper>("QGroundControl.ShapeFileHelper", 1, 0, "ShapeFileHelper", [](QQmlEngine *, QJSEngine *) { return new ShapeFileHelper(); });
 

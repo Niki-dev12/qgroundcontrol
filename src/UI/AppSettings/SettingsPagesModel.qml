@@ -124,6 +124,13 @@ ListModel {
     }
 
     ListElement {
+        name: qsTr("Getac Joystick")
+        url: "qrc:/qml/QGroundControl/AppSettings/GetacJoystickDebug.qml"
+        iconUrl: "qrc:/InstrumentValueIcons/usb.svg"
+        pageVisible: function() { return Qt.platform.os === "windows" }
+    }
+
+    ListElement {
         name: qsTr("Palette Test")
         url: "qrc:/qml/QGroundControl/AppSettings/QmlTest.qml"
         iconUrl: "qrc:/InstrumentValueIcons/photo.svg"

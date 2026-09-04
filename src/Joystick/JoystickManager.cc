@@ -15,6 +15,9 @@
 #elif defined(Q_OS_ANDROID)
     #include "JoystickAndroid.h"
 #endif
+#if defined(QGC_GETAC_SERIAL_JOYSTICK)
+    #include "JoystickGetacSerial.h"
+#endif
 #include "QGCLoggingCategory.h"
 
 #include <QtCore/qapplicationstatic.h>
@@ -91,6 +94,13 @@ void JoystickManager::_setActiveJoystickFromSettings()
     newMap = JoystickSDL::discover();
 #elif defined(Q_OS_ANDROID)
     newMap = JoystickAndroid::discover();
+#endif
+
+#if defined(QGC_GETAC_SERIAL_JOYSTICK)
+    const QMap<QString, Joystick*> getacMap = JoystickGetacSerial::discover();
+    for (auto it = getacMap.constBegin(); it != getacMap.constEnd(); ++it) {
+        newMap.insert(it.key(), it.value());
+    }
 #endif
 
     if (_activeJoystick && !newMap.contains(_activeJoystick->name())) {
