@@ -25,7 +25,7 @@ target_sources(${CMAKE_PROJECT_NAME}
 
 target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE QGC_SDL_JOYSTICK)
 
-if(WIN32 AND Qt6SerialPort_FOUND)
+if(Qt6SerialPort_FOUND)
     target_sources(${CMAKE_PROJECT_NAME}
         PRIVATE
             GetacJoystickDebugger.cc
