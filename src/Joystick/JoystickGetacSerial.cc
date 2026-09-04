@@ -64,6 +64,8 @@ JoystickGetacSerial::JoystickGetacSerial(const QString &portName, QObject *paren
     setFunctionAxis(throttleFunction, 3);
     setFunctionAxis(gimbalPitchFunction, -1);
     setFunctionAxis(gimbalYawFunction, -1);
+
+    setCalibration(0, getCalibration(0));
 }
 
 JoystickGetacSerial::~JoystickGetacSerial()

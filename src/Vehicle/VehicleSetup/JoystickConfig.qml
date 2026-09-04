@@ -68,7 +68,7 @@ SetupPage {
                         if (_activeJoystick.axisCount == 0) {
                             currentIndex = _allowJoystickSelection ? 0 : 1
                         } else {
-                            currentIndex = _activeJoystick.calibrated ? 0 : 2
+                            currentIndex = (_activeJoystick.calibrated || !_activeJoystick.requiresCalibration) ? 0 : 2
                         }
                     } else {
                         currentIndex = 0
@@ -84,7 +84,7 @@ SetupPage {
                 }
                 QGCTabButton {
                     text:       qsTr("Calibration")
-                    visible:    _activeJoystick.axisCount != 0
+                    visible:    _activeJoystick.axisCount != 0 && _activeJoystick.requiresCalibration
                 }
                 QGCTabButton {
                     text:       qsTr("Advanced")
@@ -103,5 +103,4 @@ SetupPage {
         }
     }
 }
-
 

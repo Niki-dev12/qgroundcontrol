@@ -27,7 +27,7 @@ Item {
     readonly property real axisMonitorWidth: ScreenTools.defaultFontPixelWidth * 32
 
     property bool _buttonsOnly:         _activeJoystick.axisCount == 0
-    property bool _requiresCalibration: !_activeJoystick.calibrated && !_buttonsOnly
+    property bool _requiresCalibration: _activeJoystick.requiresCalibration && !_activeJoystick.calibrated && !_buttonsOnly
 
     Column {
         id:                 mainCol
@@ -64,7 +64,7 @@ Item {
                     target: joystickManager
                     onActiveJoystickChanged: {
                         if(_activeJoystick) {
-                            enabledSwitch.checked = Qt.binding(function() { return _activeJoystick.calibrated && globals.activeVehicle.joystickEnabled })
+                            enabledSwitch.checked = Qt.binding(function() { return (_activeJoystick.calibrated || !_activeJoystick.requiresCalibration) && globals.activeVehicle.joystickEnabled })
                         }
                     }
                 }
@@ -263,5 +263,4 @@ Item {
         }
     }
 }
-
 

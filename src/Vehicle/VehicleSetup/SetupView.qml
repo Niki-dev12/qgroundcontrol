@@ -231,7 +231,7 @@ Rectangle {
             ConfigButton {
                 id:                 joystickButton
                 icon.source:        "/qmlimages/Joystick.png"
-                setupComplete:      _activeJoystick ? _activeJoystick.calibrated || _buttonsOnly : false
+                setupComplete:      _activeJoystick ? _activeJoystick.calibrated || !_activeJoystick.requiresCalibration || _buttonsOnly : false
                 visible:            _fullParameterVehicleAvailable && joystickManager.joysticks.length !== 0
                 text:               _forcedToButtonsOnly ? qsTr("Buttons") : qsTr("Joystick")
                 Layout.fillWidth:   true
